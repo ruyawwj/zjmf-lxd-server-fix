@@ -374,6 +374,71 @@ class LXCManager:
             return {'code': 500, 'msg': '无法获取容器内部IP地址'}
 
         host_listen_ip = app_config.nat_listen_ip
+        main_interface = app_config.main_interface
+
+
+        rule_comment = f'lxd_controller_nat_{hostname}_{dtype.lower()}_{dport}'
+
+        dnat_args = [
+            '-t', 'nat', '-A', 'PREROUTING',
+            '-d', host_listen_ip,
+            '-p', dtype.lower(), '--dport', str(dport),
+            '-j', 'DNAT', '--to-destination', f"{container_ip}:{sport}",
+            '-m', 'comment', '--comment', rule_comment
+        ]
+        success_dnat, msg_dnat = self._run_shell_command_for_iptables(dnat_args)
+        if not success_dnat:
+            return {'code': 500, 'msg': f"添加DNAT规则失败: {msg_dnat}"}
+
+        masquerade_args = [
+            '-t', 'nat', '-A', 'POSTROUTING',
+            '-s', container_ip,
+            '-o', main_interface,
+            '-j', 'MASQUERADE',
+            '-m', 'comment', '--comment', f'{rule_comment}_masq'
+        ]
+        success_masq, msg_masq = self._run_shell_command_for_iptables(masquerade_args)
+        if not success_masq:
+            dnat_del_args = ['-t', 'nat', '-D'] + dnat_args[2:]
+            self._run_shell_command_for_iptables(dnat_del_args)
+            return {'code': 500, 'msg': f"添加MASQUERADE规则失败: {msg_masq}"}
+
+        new_rule_meta = {
+            'hostname': hostname, 'dtype': dtype.lower(), 'dport': str(dport),
+            'sport': str(sport), 'container_ip': container_ip, 'rule_id': rule_comment
+        }
+        rules_metadata.append(new_rule_meta)
+        _save_iptables_rules_metadata(rules_metadata)
+
+        logger.info(f"容器 {hostname} 通过iptables添加DNAT和MASQUERADE规则成功")
+        return {'code': 200, 'msg': 'NAT规则(iptables)添加成功'}
+        
+        container = self._get_container_or_error(hostname)
+        if not container: return {'code': 404, 'msg': '容器未找到'}
+
+        logger.info(f"为容器 {hostname} 通过iptables添加NAT规则: {dtype} {dport} -> {sport}")
+
+        limit = int(self._get_user_metadata(container, 'nat_acl_limit', 0))
+        rules_metadata = _load_iptables_rules_metadata()
+        current_host_rules_count = sum(1 for r in rules_metadata if r.get('hostname') == hostname)
+
+        if limit > 0 and current_host_rules_count >= limit:
+            logger.warning(f"容器 {hostname} 已达到iptables NAT规则数量上限 ({limit}条)")
+            return {'code': 403, 'msg': f'已达到NAT规则数量上限 ({limit}条)'}
+
+        for rule_meta in rules_metadata:
+            if rule_meta.get('hostname') == hostname and \
+               rule_meta.get('dtype', '').lower() == dtype.lower() and \
+               str(rule_meta.get('dport')) == str(dport):
+                logger.warning(f"容器 {hostname} 的iptables NAT规则 ({dtype} {dport}) 已存在")
+                return {'code': 409, 'msg': '此外部端口和协议的NAT规则已存在'}
+
+        container_ip = self._get_container_ip(container)
+        if not container_ip:
+            logger.error(f"为容器 {hostname} 添加iptables NAT规则失败: 无法获取内部IP")
+            return {'code': 500, 'msg': '无法获取容器内部IP地址'}
+
+        host_listen_ip = app_config.nat_listen_ip
         main_interface = getattr(app_config, 'main_interface', None)
         if not main_interface:
             logger.error("配置文件中缺少 main_interface (主网卡名) for iptables MASQUERADE rule")
