@@ -21,6 +21,12 @@ class AppConfig:
         self.storage_pool = parser.get('lxc', 'STORAGE_POOL', fallback='default')
         self.default_container_user = parser.get('lxc', 'DEFAULT_CONTAINER_USER', fallback='root')
 
+        self.nat_listen_ip = parser.get('lxc', 'NAT_LISTEN_IP', fallback=None)
+
+        if not self.nat_listen_ip:
+            raise ValueError("配置文件 [lxc] 中必须设置 NAT_LISTEN_IP，因为NAT模式已固定开启")
+
+
         self.managed_vhost_dir = parser.get('apache', 'MANAGED_VHOST_DIR', fallback=None)
         self.apache_config_suffix = parser.get('apache', 'APACHE_CONFIG_SUFFIX', fallback='.conf')
         self.web_server_reload_command = parser.get('apache', 'WEB_SERVER_RELOAD_COMMAND', fallback=None)
@@ -30,7 +36,7 @@ class AppConfig:
 
         if self.managed_vhost_dir and not self.managed_vhost_dir.endswith('/'):
             self.managed_vhost_dir += '/'
-        
+
         if self.managed_vhost_dir:
              os.makedirs(self.managed_vhost_dir, exist_ok=True)
 
