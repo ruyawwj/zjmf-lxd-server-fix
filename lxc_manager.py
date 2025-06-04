@@ -347,7 +347,7 @@ class LXCManager:
         logger.info(f"容器 {hostname} iptables NAT规则列表: {container_rules}")
         return {'code': 200, 'msg': '获取成功', 'data': container_rules}
 
-    def add_nat_rule_via_iptables(self, hostname, dtype, dport, sport):
+def add_nat_rule_via_iptables(self, hostname, dtype, dport, sport):
         container = self._get_container_or_error(hostname)
         if not container: return {'code': 404, 'msg': '容器未找到'}
 
@@ -374,9 +374,7 @@ class LXCManager:
             return {'code': 500, 'msg': '无法获取容器内部IP地址'}
 
         host_listen_ip = app_config.nat_listen_ip
-        main_interface = getattr(app_config, 'main_interface', None)
-        if not main_interface:
-            logger.error("配置文件中缺少 main_interface (主网卡名) for iptables MASQUERADE rule")
+        main_interface = app_config.main_interface
 
 
         rule_comment = f'lxd_controller_nat_{hostname}_{dtype.lower()}_{dport}'
@@ -392,19 +390,18 @@ class LXCManager:
         if not success_dnat:
             return {'code': 500, 'msg': f"添加DNAT规则失败: {msg_dnat}"}
 
-        if main_interface:
-            masquerade_args = [
-                '-t', 'nat', '-A', 'POSTROUTING',
-                '-s', container_ip,
-                '-o', main_interface,
-                '-j', 'MASQUERADE',
-                '-m', 'comment', '--comment', f'{rule_comment}_masq'
-            ]
-            success_masq, msg_masq = self._run_shell_command_for_iptables(masquerade_args)
-            if not success_masq:
-                dnat_del_args = ['-t', 'nat', '-D'] + dnat_args[2:]
-                self._run_shell_command_for_iptables(dnat_del_args)
-                return {'code': 500, 'msg': f"添加MASQUERADE规则失败: {msg_masq}"}
+        masquerade_args = [
+            '-t', 'nat', '-A', 'POSTROUTING',
+            '-s', container_ip,
+            '-o', main_interface,
+            '-j', 'MASQUERADE',
+            '-m', 'comment', '--comment', f'{rule_comment}_masq'
+        ]
+        success_masq, msg_masq = self._run_shell_command_for_iptables(masquerade_args)
+        if not success_masq:
+            dnat_del_args = ['-t', 'nat', '-D'] + dnat_args[2:]
+            self._run_shell_command_for_iptables(dnat_del_args)
+            return {'code': 500, 'msg': f"添加MASQUERADE规则失败: {msg_masq}"}
 
         new_rule_meta = {
             'hostname': hostname, 'dtype': dtype.lower(), 'dport': str(dport),
@@ -415,79 +412,7 @@ class LXCManager:
 
         logger.info(f"容器 {hostname} 通过iptables添加DNAT和MASQUERADE规则成功")
         return {'code': 200, 'msg': 'NAT规则(iptables)添加成功'}
-
-    def delete_nat_rule_via_iptables(self, hostname, dtype, dport, sport, container_ip_at_creation_time=None):
-        logger.info(f"为容器 {hostname} 通过iptables删除NAT规则: {dtype} {dport} -> {sport}")
-        host_listen_ip = app_config.nat_listen_ip
-        rules_metadata = _load_iptables_rules_metadata()
-        rules_to_keep = []
-        rule_found_and_deleted = False
-
-        rule_to_delete_meta = None
-        for rule_meta in rules_metadata:
-            if rule_meta.get('hostname') == hostname and \
-               rule_meta.get('dtype', '').lower() == dtype.lower() and \
-               str(rule_meta.get('dport')) == str(dport):
-                rule_to_delete_meta = rule_meta
-                break
-
-        if not rule_to_delete_meta:
-            logger.warning(f"未在元数据中找到容器 {hostname} 的规则 {dtype} {dport}，可能已被删除或未正确记录")
-            if not container_ip_at_creation_time:
-                current_container = self._get_container_or_error(hostname)
-                if current_container:
-                    container_ip_at_creation_time = self._get_container_ip(current_container)
-                if not container_ip_at_creation_time:
-                     logger.error(f"无法确定删除规则所需的容器IP for {hostname} {dtype} {dport}")
-                     return {'code': 404, 'msg': 'NAT规则元数据未找到，且无法确定容器原始IP以尝试删除'}
-
-        if rule_to_delete_meta and not container_ip_at_creation_time:
-            container_ip_at_creation_time = rule_to_delete_meta.get('container_ip')
-
-        if not container_ip_at_creation_time:
-            logger.error(f"最终无法确定删除规则所需的容器IP for {hostname} {dtype} {dport}")
-            return {'code': 500, 'msg': '删除iptables规则失败: 无法确定容器原始IP'}
-
-        rule_comment = rule_to_delete_meta.get('rule_id') if rule_to_delete_meta else f'lxd_controller_nat_{hostname}_{dtype.lower()}_{dport}'
-
-        dnat_del_args = [
-            '-t', 'nat', '-D', 'PREROUTING',
-            '-d', host_listen_ip,
-            '-p', dtype.lower(), '--dport', str(dport),
-            '-j', 'DNAT', '--to-destination', f"{container_ip_at_creation_time}:{sport}",
-            '-m', 'comment', '--comment', rule_comment
-        ]
-        success_dnat, msg_dnat = self._run_shell_command_for_iptables(dnat_del_args)
-        if success_dnat:
-            rule_found_and_deleted = True
-        else:
-            logger.warning(f"删除DNAT规则可能失败 (或规则不存在): {msg_dnat}")
-
-        main_interface = getattr(app_config, 'main_interface', None)
-        if main_interface:
-            masquerade_del_args = [
-                '-t', 'nat', '-D', 'POSTROUTING',
-                '-s', container_ip_at_creation_time,
-                '-o', main_interface,
-                '-j', 'MASQUERADE',
-                '-m', 'comment', '--comment', f'{rule_comment}_masq'
-            ]
-            success_masq, msg_masq = self._run_shell_command_for_iptables(masquerade_del_args)
-            if not success_masq:
-                 logger.warning(f"删除MASQUERADE规则可能失败 (或规则不存在): {msg_masq}")
-
-        if rule_to_delete_meta:
-            for rule_meta_item in rules_metadata:
-                if rule_meta_item.get('rule_id') != rule_comment:
-                    rules_to_keep.append(rule_meta_item)
-            _save_iptables_rules_metadata(rules_to_keep)
-            logger.info(f"从元数据中移除规则: {rule_comment}")
-        elif not rule_found_and_deleted and not success_dnat :
-             return {'code': 404, 'msg': 'NAT规则未找到或删除失败'}
-
-        logger.info(f"容器 {hostname} 通过iptables删除DNAT规则尝试完成")
-        return {'code': 200, 'msg': 'NAT规则(iptables)删除尝试完成'}
-
+    
     def list_domain_bindings(self, hostname, internal_call=False):
         container = None
         if not internal_call:
