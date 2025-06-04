@@ -1,0 +1,272 @@
+<style>
+    .NAT_btn {
+      display: flex;
+    }
+    .select-protocol {
+      position: relative;
+    }
+    #select-protocol {
+      display: none;
+    }
+    .container {
+      width: 100vw;
+    }
+    
+    .public_title {
+      display: flex;
+      justify-content: space-between;
+    }
+    
+    .public_title_text {
+      font-size: 16px;
+      line-height: 28px;
+      font-weight: bold;
+    }
+    
+    .public_title_ul {
+      list-style: none;
+    }
+    
+    .public_title_ul > li {
+      width: 4px;
+      height: 4px;
+      float: left;
+      margin-right: 10px;
+      background-color: #2c67ee;
+      border-radius: 50%;
+      transition: all 0.2s;
+    }
+    
+    
+    .btn_main {
+      outline: none;
+      width: 100px;
+      height: 30px;
+      border-style: none;
+      border-radius: 4px;
+      color: #fff;
+      transition: all 0.2s;
+    }
+    
+    .purple {
+      background-color: #2f54ea;
+      border: 1px solid #2f54ea;
+      border-radius: 4px;
+    }
+    
+    .purple:hover {
+      background-color: #99b7fd !important;
+    }
+    </style>
+    <div class="NAT_btn">
+      <button type="button" class="btn btn-primary waves-effect waves-light" data-toggle="modal" data-target="#addModalnatweb">创建</button>
+    </div>
+    <div class="container">
+      <!-- 创建NAT转发模态框 -->
+      <div class="modal fade" id="addModalnatweb">
+        <div class="modal-dialog">
+          <div class="modal-content">
+            <div class="modal-header">
+              <span class="modal-title">创建域名绑定</span>
+              <button type="button" class="close" data-dismiss="modal" onclick="closeAddModal()">&times;</button>
+            </div>
+            <div class="modal-body">
+              <div class="modal_limit">
+                <div class="modal_main">
+                  <form>
+                    <div class="form-group">
+                      <label for="name">
+                    <div class="form-group">
+                      <label for="externalPort">
+                        <span style="color:#f00">*</span>
+                        域名</label>
+                      <input required name="domain" type="text" class="form-control"  id="domaininput" placeholder="例如www.baidu.com">
+                      <div class="invalid-feedback" id="feedbacknatweb"></div>
+                    </div>
+                  </form>
+                </div>
+                <div class="modal-footer">
+                  <button type="button" class="btn btn-primary waves-effect waves-light confirm-btnnatweb"
+                    style="margin-left:10px">确定</button>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+    <div class="table-responsive">
+    <table class="table mb-0 mt-3">
+      <thead>
+        <tr>
+          <th>域名</th>
+          <th style="width:90px">管理</th>
+        </tr>
+      </thead>
+      
+      <tbody>
+        {foreach $list as $list }
+        <tr>
+          <td>{$list.Domain}</td>
+          <td>
+            <button type="button" class="btn btn-link deleteNATnatweb" data-id="{$list.ID}" onclick="webedit(this)">删除</button>
+          </td>
+        </tr>
+        {/foreach}
+      </tbody>
+    </table>
+    </div>
+    <div style="display: none" id="loading-circlenatacl">
+      <div class="loading_limit">
+        <div class="loading_inner">
+          <div></div>
+          <div></div>
+          <div></div>
+          <div></div>
+          <div></div>
+          <div></div>
+          <div></div>
+          <div></div>
+          <div></div>
+          <div></div>
+        </div>
+      </div>
+    </div>
+    <script>
+      // 关闭模态框
+      function closeAddModal() {
+        const internalPort = document.getElementById("sportinput");
+      }
+    
+      function webedit(val){ 
+            var value = $(val).parent().parent().find("td");
+            domainval = value.eq(0).text();
+            //console.log(value.eq(1).text());
+      }
+    
+      // NAT转发表格行内 删除按钮
+      $('.deleteNATnatweb').on('click', function () {
+        if ($(this).data('disabled') == 'true') {
+          return;
+        }
+        delete_nat_btn = $(this)
+        Swal.fire({
+          position: 'top',
+          title: '确定删除此绑定吗？',
+          type: 'question',
+          showCancelButton: true,
+          confirmButtonColor: '#6e9aff',
+          cancelButtonColor: '#d33',
+          confirmButtonText: '确认删除',
+          cancelButtonText: '取消'
+        }).then((result) => {
+          if (result.value) {
+            delete_nat_btn.html($('#loading-circlenatacl').html());
+            delete_nat_btn.data('disabled', 'true');
+            ajax({
+              type: "post",
+              url: "{$MODULE_CUSTOM_API}",
+              data: { "func": "domaindel", "domain": domainval },
+              success: function (data) {
+                if (data.status == 200) {
+                  Swal.fire({
+                    position: 'top',
+                    title: '删除成功',
+                    type: 'success',
+                    confirmButtonColor: '#6e9aff',
+                  }).then((isConfirm) => window.location.reload());
+                } else {
+                  delete_nat_btn.html('删除')
+                  delete_nat_btn.data('disabled', 'false')
+                  Swal.fire("删除失败", data.msg, "error");
+                }
+    
+              }
+            })
+          }
+        })
+      });
+      $('.confirm-btnnatweb').on('click', function () {
+        const domain = document.getElementById("domaininput"); // 输入框的值
+        const DomainFeedback = document.getElementById("feedbacknatweb"); // 输入框的验证提示
+        if (domain.value === "") {
+          DomainFeedback.innerHTML = "请填写绑定域名";
+          domain.classList.remove("is-valid"); //清除合法状态
+          domain.classList.add("is-invalid"); //添加非法状态
+          return
+        } else {
+          //清除错误提示，改成成功提示
+          domain.classList.remove("is-invalid");
+          // internalPort.classList.add("is-valid");
+          DomainFeedback.innerHTML = "";
+        }
+    
+        if (!$(this).data('submit')) {
+          $(this).html($('#loading-circlenatacl').html());
+          $(this).data('submit', 'submit')
+          ajax({
+            type: "post",
+            url: "{$MODULE_CUSTOM_API}",
+            data: $("#addModalnatweb").find("form").serialize() + "&func=domainadd",
+            success: function (data) {
+              $(".confirm-btnnatweb").html('确认')
+              $(".confirm-btnnatweb").data('submit', '')
+              if (data.status == 200) {
+                $("#addModalnatweb").modal('hide')
+                Swal.fire({
+                  position: 'top',
+                  title: '创建成功',
+                  type: 'success',
+                  confirmButtonColor: '#6e9aff',
+                }).then((isConfirm) => window.location.reload());
+              } else {
+                Swal.fire("创建失败", data.msg, "error");
+              }
+            },
+            error: function () {
+              $(".confirm-btnnatweb").html('确认')
+              $(".confirm-btnnatweb").data('submit', '')
+            }
+          })
+        }
+      });
+      function ajax(options) {
+        //创建一个ajax对象
+        var xhr = new XMLHttpRequest() || new ActiveXObject("Microsoft,XMLHTTP");
+        //数据的处理 {a:1,b:2} a=1&b=2;
+        if (typeof (options.data) != 'string') {
+          var str = "";
+          for (var key in options.data) {
+            str += "&" + key + "=" + options.data[key];
+          }
+          str = str.slice(1)
+        } else {
+          var str = options.data;
+        }
+        options.dataType = options.dataType || 'json';
+        if (options.type == "get") {
+          var url = options.url + "?" + str;
+          xhr.open("get", url);
+          xhr.setRequestHeader("Authorization", "JWT {$Think.get.jwt}");
+          xhr.send();
+        } else if (options.type == "post") {
+          xhr.open("post", options.url);
+          xhr.setRequestHeader("content-type", "application/x-www-form-urlencoded");
+          xhr.setRequestHeader("Authorization", "JWT {$Think.get.jwt}");
+          xhr.send(str)
+        }
+        //监听
+        xhr.onreadystatechange = function () {
+          //当请求成功的时候
+          if (xhr.readyState == 4 && xhr.status == 200) {
+            var d = xhr.responseText;
+            d = JSON.parse(d);
+            //将请求的数据传递给成功回调函数
+            options.success && options.success(d, xhr.responseXML)
+          } else if (xhr.status != 200) {
+            //当失败的时候将服务器的状态传递给失败的回调函数
+            options.error && options.error(xhr.status);
+          }
+        }
+      }
+    </script>
