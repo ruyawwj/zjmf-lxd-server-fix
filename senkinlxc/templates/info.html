@@ -1,0 +1,61 @@
+<!doctype html>
+<html>
+    <head>
+      <meta charset="UTF-8">
+      <meta name="viewport" id="viewport" content="width=device-width, initial-scale=1">
+      <!-- <script src="https://cdn.staticfile.org/echarts/4.3.0/echarts.min.js"></script> -->
+      <link href="https://cdn.bootcdn.net/ajax/libs/mdui/1.0.2/css/mdui.min.css" rel="stylesheet">
+    </head>
+    <body>
+<div class="mdui-card">
+  <div class="mdui-card-content">
+    <br/>
+    - 1. 首次开通，请您先到端口转发页面转发22端口，才可进行SSH连接。
+    <br/>
+    - 2. 开通/重装系统之后，请您在保证主机开机的前提下点击网页的修改密码，修改后才可登录。
+    <br/>
+    - 3. 部分操作响应较慢，请耐心等待，不要离开页面。
+    <br/>  
+    <br/>
+  </div>
+</div>
+
+<br/>
+
+<br/>
+
+<!-- 四个值显示 -->
+      <div class="mdui-card">
+        <div class="mdui-container">
+          <div class="mdui-card-content">
+            <div class="mdui-typo-title mdui-text-truncase">容器 状态 </div>
+
+            <div class="value-display">
+              <p class="mdui-text-truncase">内存: {$data.UsedRam*100/$data.TotalRam}% ( {$data.UsedRam}MB / {$data.TotalRam}MB )</p>
+              <div class="mdui-progress">
+                <div class="mdui-progress-determinate" style="width: {$data.UsedRam*100/$data.TotalRam}% !important;"></div>
+              </div>
+            </div>
+
+            <div class="value-display">
+              <p class="mdui-text-truncase">硬盘: {$data.UsedDisk*100/$data.TotalDisk}% ( {$data.UsedDisk/1024}GB / {$data.TotalDisk/1024}GB )</p>
+              <div class="mdui-progress">
+                <div class="mdui-progress-determinate" style="width: {$data.UsedDisk*100/$data.TotalDisk}% !important;"></div>
+              </div>
+            </div>
+            <div class="value-display">
+              <p class="mdui-text-truncase">流量: {$data.UseBandwidth*100/$data.Bandwidth}% ( {$data.UseBandwidth}GB / {$data.Bandwidth}GB )</p>
+              <div class="mdui-progress">
+                <div class="mdui-progress-determinate" style="width: {$data.UseBandwidth*100/$data.Bandwidth}% !important;"></div>
+              </div>
+            </div>
+
+          </div>
+        </div>
+      </div>
+
+
+
+      <script src="https://cdn.bootcdn.net/ajax/libs/mdui/1.0.2/js/mdui.min.js"></script>
+    </body>
+</html>
