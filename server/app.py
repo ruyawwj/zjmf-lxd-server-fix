@@ -168,45 +168,6 @@ def api_delport():
     logger.info(f"请求delport for: {hostname}, {dtype}:{dport}->{sport}")
     return jsonify(lxc_manager.delete_nat_rule_via_iptables(hostname, dtype, dport, sport, container_ip_at_creation_time=container_ip_at_creation))
 
-
-@app.route('/api/domainlist', methods=['GET'])
-@api_key_required
-def api_domainlist():
-    hostname = request.args.get('hostname')
-    if not hostname:
-        logger.warning("API /api/domainlist 调用缺少 hostname 参数")
-        return jsonify({'code': 400, 'msg': '缺少hostname参数'}), 400
-    logger.info(f"请求domainlist for: {hostname}")
-    return jsonify(lxc_manager.list_domain_bindings(hostname))
-
-@app.route('/api/adddomain', methods=['POST'])
-@api_key_required
-def api_adddomain():
-    hostname_from_form = request.form.get('hostname')
-    hostname_from_query = request.args.get('hostname')
-    hostname = hostname_from_form or hostname_from_query
-
-    domain = request.form.get('domain')
-    if not all([hostname, domain]):
-        logger.warning(f"API /api/adddomain 调用缺少hostname或domain参数. Hostname: {hostname}, Domain: {domain}. Form: {request.form}, Args: {request.args}")
-        return jsonify({'code': 400, 'msg': '缺少hostname或domain参数'}), 400
-    logger.info(f"请求adddomain for: {hostname}, domain: {domain}")
-    return jsonify(lxc_manager.add_domain_binding(hostname, domain))
-
-@app.route('/api/deldomain', methods=['POST'])
-@api_key_required
-def api_deldomain():
-    hostname_from_form = request.form.get('hostname')
-    hostname_from_query = request.args.get('hostname')
-    hostname = hostname_from_form or hostname_from_query
-
-    domain = request.form.get('domain')
-    if not all([hostname, domain]):
-        logger.warning(f"API /api/deldomain 调用缺少hostname或domain参数. Hostname: {hostname}, Domain: {domain}. Form: {request.form}, Args: {request.args}")
-        return jsonify({'code': 400, 'msg': '缺少hostname或domain参数'}), 400
-    logger.info(f"请求deldomain for: {hostname}, domain: {domain}")
-    return jsonify(lxc_manager.delete_domain_binding(hostname, domain))
-
 if __name__ == '__main__':
     try:
         logger.info(f"应用开始启动，监听端口: {app_config.http_port}, 日志级别: {app_config.log_level}")

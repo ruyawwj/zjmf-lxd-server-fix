@@ -29,18 +29,4 @@ class AppConfig:
         if not self.main_interface:
             raise ValueError("配置文件 [lxc] 中必须设置 MAIN_INTERFACE (主网卡名)，用于iptables MASQUERADE规则")
 
-
-        self.managed_vhost_dir = parser.get('apache', 'MANAGED_VHOST_DIR', fallback=None)
-        self.apache_config_suffix = parser.get('apache', 'APACHE_CONFIG_SUFFIX', fallback='.conf')
-        self.web_server_reload_command = parser.get('apache', 'WEB_SERVER_RELOAD_COMMAND', fallback=None)
-        self.a2ensite_command = parser.get('apache', 'A2ENSITE_COMMAND', fallback=None)
-        self.a2dissite_command = parser.get('apache', 'A2DISSITE_COMMAND', fallback=None)
-        self.default_proxy_port = parser.getint('apache', 'DEFAULT_PROXY_PORT', fallback=80)
-
-        if self.managed_vhost_dir and not self.managed_vhost_dir.endswith('/'):
-            self.managed_vhost_dir += '/'
-
-        if self.managed_vhost_dir:
-             os.makedirs(self.managed_vhost_dir, exist_ok=True)
-
 app_config = AppConfig()
