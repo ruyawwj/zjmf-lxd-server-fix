@@ -5,6 +5,7 @@ import logging
 import json
 import subprocess
 import os
+import shlex
 
 logger = logging.getLogger(__name__)
 
@@ -267,18 +268,47 @@ class LXCManager:
 
     def change_password(self, hostname, new_password):
         container = self._get_container_or_error(hostname)
-        if not container: return {'code': 404, 'msg': '容器未找到'}
-        if container.status != 'Running': return {'code': 400, 'msg': '容器未运行'}
+        if not container:
+            return {'code': 404, 'msg': '容器未找到'}
+        if container.status != 'Running':
+            return {'code': 400, 'msg': '容器未运行'}
         try:
             user = app_config.default_container_user
-            logger.info(f"开始为容器 {hostname} 的用户 {user} 修改密码")
-            exit_code, _, stderr = container.execute(['chpasswd'], stdin=f"{user}:{new_password}\n")
+            logger.info(f"开始为容器 {hostname} 的用户 {user} 修改密码 (使用 bash -c 'echo ... | chpasswd')")
+
+            escaped_new_password = shlex.quote(new_password)
+            command_to_execute_in_bash = f"echo '{user}:{escaped_new_password}' | chpasswd"
+            
+            logger.debug(f"在容器内执行命令: bash -c \"{command_to_execute_in_bash}\"")
+            exit_code, stdout, stderr = container.execute(['bash', '-c', command_to_execute_in_bash])
+            
             if exit_code == 0:
-                logger.info(f"容器 {hostname} 密码修改成功")
+                logger.info(f"容器 {hostname} 密码使用 bash -c 'echo ... | chpasswd' 修改成功")
                 return {'code': 200, 'msg': '密码修改成功'}
-            err_msg = stderr.decode() if stderr else "未知错误"
-            logger.error(f"容器 {hostname} 密码修改失败: {err_msg}")
-            return {'code': 500, 'msg': f'密码修改失败: {err_msg}'}
+            else:
+                err_msg_stdout = ""
+                if stdout:
+                    if isinstance(stdout, bytes):
+                        err_msg_stdout = stdout.decode('utf-8', errors='ignore').strip()
+                    else:
+                        err_msg_stdout = str(stdout).strip()
+                
+                err_msg_stderr = ""
+                if stderr:
+                    if isinstance(stderr, bytes):
+                        err_msg_stderr = stderr.decode('utf-8', errors='ignore').strip()
+                    else:
+                        err_msg_stderr = str(stderr).strip()
+
+                full_err_msg = []
+                if err_msg_stdout:
+                    full_err_msg.append(f"STDOUT: {err_msg_stdout}")
+                if err_msg_stderr:
+                    full_err_msg.append(f"STDERR: {err_msg_stderr}")
+                
+                combined_err_msg = "; ".join(full_err_msg) if full_err_msg else "命令执行失败，但未提供具体错误信息"
+                logger.error(f"容器 {hostname} 使用 bash -c 'echo ... | chpasswd' 修改密码失败 (exit_code: {exit_code}): {combined_err_msg}")
+                return {'code': 500, 'msg': f'密码修改失败: {combined_err_msg}'}
         except LXDAPIException as e:
             logger.error(f"LXD API错误 (change password for {hostname}): {e}")
             return {'code': 500, 'msg': f'LXD API错误 (password): {e}'}
