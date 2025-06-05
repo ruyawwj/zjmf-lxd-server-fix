@@ -1,0 +1,51 @@
+<!doctype html>
+<html>
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>操作错误</title>
+  <link href="https://cdn.bootcdn.net/ajax/libs/mdui/1.0.2/css/mdui.min.css" rel="stylesheet">
+  <style>
+    body, html {
+      height: 100%;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      background-color: #f5f5f5;
+    }
+    .error-card {
+      max-width: 400px;
+      width: 90%;
+    }
+    .mdui-card-header-title {
+        color: #f44336;
+    }
+  </style>
+</head>
+<body class="mdui-theme-layout-auto">
+
+<div class="mdui-card error-card">
+  <div class="mdui-card-header">
+    <i class="mdui-icon material-icons mdui-text-color-red">error_outline</i>
+    <div class="mdui-card-header-title">发生错误</div>
+    <div class="mdui-card-header-subtitle">无法完成您的请求</div>
+  </div>
+  <div class="mdui-card-content mdui-typo">
+    <p>错误信息：无法显示相关信息。</p>
+    <p>可能的原因：</p>
+    <ul>
+      <li>服务器通讯失败。</li>
+      <li>请求的资源不存在或暂时不可用。</li>
+      <li>您的网络连接可能存在问题。</li>
+    </ul>
+    <p>您可以尝试刷新页面，或稍后再试。如果问题持续存在，请联系技术支持。</p>
+  </div>
+  <div class="mdui-card-actions">
+    <button class="mdui-btn mdui-ripple mdui-float-right" onclick="window.history.back()">返回上一页</button>
+    <button class="mdui-btn mdui-ripple" onclick="location.reload()">刷新页面</button>
+  </div>
+</div>
+
+<script src="https://cdn.bootcdn.net/ajax/libs/mdui/1.0.2/js/mdui.min.js"></script>
+</body>
+</html>
