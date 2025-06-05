@@ -219,10 +219,19 @@ function lxdserver_CreateAccount($params)
             'dedicatedip'  => $params['server_ip'],
             'domainstatus' => 'Active',
             'username'     => $params['domain'],
-            'password'     => $sys_pwd,
+            // 'password'     => $sys_pwd, // 根据PVE插件的逻辑，注释掉此行，不再更新密码，让面板保留其初始值
         ];
-        Db::name('host')->where('id', $params['hostid'])->update($update);
 
+        if (!empty($res['data']['ssh_port'])) {
+            $update['port'] = $res['data']['ssh_port'];
+        }
+
+        try {
+            Db::name('host')->where('id', $params['hostid'])->update($update);
+        } catch (\Exception $e) {
+             return ['status' => 'error', 'msg' => ($res['msg'] ?? '创建成功，但同步数据到面板失败: ' . $e->getMessage())];
+        }
+        
         return ['status' => 'success', 'msg' => $res['msg'] ?? '创建成功'];
     } else {
         return ['status' => 'error', 'msg' => $res['msg'] ?? '创建失败'];
@@ -420,6 +429,11 @@ function lxdserver_CrackPassword($params, $new_pass)
     $res = lxdserver_JSONCurl($params, $data, 'POST');
 
     if (isset($res['code']) && $res['code'] == 200) {
+        try {
+            Db::name('host')->where('id', $params['hostid'])->update(['password' => $new_pass]);
+        } catch (\Exception $e) {
+            return ['status' => 'error', 'msg' => ($res['msg'] ?? $res['message'] ?? 'LXD容器密码重置成功，但同步新密码到面板数据库失败: ' . $e->getMessage())];
+        }
         return ['status' => 'success', 'msg' => $res['msg'] ?? $res['message'] ?? '密码重置成功'];
     } else {
         return ['status' => 'error', 'msg' => $res['msg'] ?? $res['message'] ?? '密码重置失败'];
