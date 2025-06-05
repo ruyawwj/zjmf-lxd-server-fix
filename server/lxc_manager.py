@@ -6,8 +6,6 @@ import json
 import subprocess
 import os
 import shlex
-import random
-import time
 
 logger = logging.getLogger(__name__)
 
@@ -51,15 +49,19 @@ class LXCManager:
         target_bridge = app_config.network_bridge
         nic_name_on_target_bridge = None
         container_name = container.name
+
         logger.debug(f"开始为容器 {container_name} 获取IP地址，目标网桥: {target_bridge}")
+
         for device_name, device_config in container.devices.items():
             if device_config.get('type') == 'nic' and device_config.get('network') == target_bridge:
                 nic_name_on_target_bridge = device_name
                 logger.debug(f"容器 {container_name} 上找到连接到网桥 {target_bridge} 的接口设备: {nic_name_on_target_bridge}")
                 break
+
         if not nic_name_on_target_bridge:
             logger.warning(f"容器 {container_name} 没有找到连接到网桥 {target_bridge} 的网络接口设备。设备列表: {container.devices}")
             return None
+
         try:
             state = container.state()
             if state.network and nic_name_on_target_bridge in state.network:
@@ -75,6 +77,7 @@ class LXCManager:
                 logger.warning(f"容器 {container_name} 的网络状态中没有接口 {nic_name_on_target_bridge} 的信息。当前网络状态: {state.network}")
         except LXDAPIException as e:
             logger.error(f"获取容器 {container_name} 网络状态时发生LXD API错误: {e}")
+
         logger.warning(f"未能为容器 {container_name} 获取IP地址")
         return None
 
@@ -111,6 +114,7 @@ class LXCManager:
         container = self._get_container_or_error(hostname)
         if not container:
             return {'code': 404, 'msg': '容器未找到'}
+
         try:
             state = container.state()
             config = container.config
@@ -157,7 +161,6 @@ class LXCManager:
         if self.client.containers.exists(hostname):
             return {'code': 409, 'msg': '容器已存在'}
         image_alias = params.get('system') or app_config.default_image_alias
-
         container_config_obj = {
             'name': hostname,
             'source': {'type': 'image', 'alias': image_alias},
@@ -165,6 +168,7 @@ class LXCManager:
                 'limits.cpu': str(params.get('cpu', '1')),
                 'limits.memory': f"{params.get('ram', '128')}MB",
                 'security.nesting': 'true',
+                'user.user-data': f"#cloud-config\nuser: {app_config.default_container_user}\npassword: {params.get('password')}\nchpasswd: {{ expire: False }}\nssh_pwauth: True"
             },
             'devices': {
                 'root': {
@@ -176,101 +180,25 @@ class LXCManager:
                 }
             }
         }
-
         if params.get('up') and params.get('down'):
             container_config_obj['devices']['eth0']['limits.ingress'] = f"{int(params.get('up'))*125000}"
             container_config_obj['devices']['eth0']['limits.egress'] = f"{int(params.get('down'))*125000}"
-
-        container_to_cleanup_on_error = None
         try:
             logger.info(f"开始创建容器 {hostname} 使用配置: {container_config_obj}")
             container = self.client.containers.create(container_config_obj, wait=True)
-            container_to_cleanup_on_error = container
-            
             self._set_user_metadata(container, 'nat_acl_limit', params.get('ports', 0))
             self._set_user_metadata(container, 'flow_limit_gb', params.get('bandwidth', 0))
             self._set_user_metadata(container, 'disk_size_mb', params.get('disk', '1024'))
             logger.info(f"容器 {hostname} 配置完成，开始启动...")
             container.start(wait=True)
             logger.info(f"容器 {hostname} 启动成功")
-
-            logger.info(f"容器 {hostname} 已启动，准备设置初始密码...")
-            time.sleep(10)
-
-            new_password = params.get('password')
-            if not new_password:
-                logger.error(f"为容器 {hostname} 设置初始密码失败：未提供密码。")
-            else:
-                user_for_password = app_config.default_container_user
-                try:
-                    logger.info(f"为容器 {hostname} 的用户 {user_for_password} 设置初始密码 (使用 bash -c 'echo ... | chpasswd')")
-                    escaped_new_password = shlex.quote(new_password)
-                    command_to_execute_in_bash = f"echo '{user_for_password}:{escaped_new_password}' | chpasswd"
-                    logger.debug(f"在容器内执行命令: bash -c \"{command_to_execute_in_bash}\"")
-
-                    current_status_check = container.state().status
-                    if current_status_check.lower() != 'running':
-                        logger.error(f"容器 {hostname} 未处于运行状态 (当前状态: {current_status_check})，无法设置初始密码。")
-                    else:
-                        exit_code, stdout, stderr = container.execute(['bash', '-c', command_to_execute_in_bash])
-                        if exit_code == 0:
-                            logger.info(f"容器 {hostname} 初始密码使用 bash -c 'echo ... | chpasswd' 设置成功")
-                        else:
-                            err_msg_stdout = stdout.decode('utf-8', errors='ignore').strip() if stdout else ""
-                            err_msg_stderr = stderr.decode('utf-8', errors='ignore').strip() if stderr else ""
-                            full_err_msg = []
-                            if err_msg_stdout: full_err_msg.append(f"STDOUT: {err_msg_stdout}")
-                            if err_msg_stderr: full_err_msg.append(f"STDERR: {err_msg_stderr}")
-                            combined_err_msg = "; ".join(full_err_msg) if full_err_msg else "命令执行失败，但未提供具体错误信息"
-                            logger.error(f"容器 {hostname} 设置初始密码失败 (exit_code: {exit_code}): {combined_err_msg}")
-                except LXDAPIException as e_passwd:
-                    logger.error(f"为容器 {hostname} 设置初始密码时发生LXD API错误: {e_passwd}")
-                except Exception as e_passwd_generic:
-                    logger.error(f"为容器 {hostname} 设置初始密码时发生未知错误: {e_passwd_generic}", exc_info=True)
-            try:
-                ssh_external_port_min = 10000
-                ssh_external_port_max = 65535
-                random_ssh_dport = random.randint(ssh_external_port_min, ssh_external_port_max)
-                logger.info(f"尝试为容器 {hostname} 自动添加 SSH (端口 22) 的 NAT 规则，使用外部端口 {random_ssh_dport}")
-
-                container_ip_for_nat = None
-                nat_add_attempts = 0
-                while not container_ip_for_nat and nat_add_attempts < 3:
-                    container_ip_for_nat = self._get_container_ip(container)
-                    if container_ip_for_nat: break
-                    logger.warning(f"为容器 {hostname} 获取IP失败 (尝试 {nat_add_attempts+1}/3)，等待后重试...")
-                    time.sleep(5)
-                    nat_add_attempts += 1
-
-                if not container_ip_for_nat:
-                    logger.error(f"为容器 {hostname} 自动添加 SSH NAT 规则失败：多次尝试后仍无法获取容器IP地址。")
-                else:
-                    add_ssh_rule_result = self.add_nat_rule_via_iptables(hostname, 'tcp', str(random_ssh_dport), '22')
-                    if add_ssh_rule_result.get('code') == 200:
-                        logger.info(f"成功为容器 {hostname} 自动添加 SSH NAT 规则: 外部端口 {random_ssh_dport} -> 内部端口 22")
-                    elif add_ssh_rule_result.get('code') == 409:
-                        logger.warning(f"尝试为容器 {hostname} 自动添加 SSH NAT 规则失败：外部端口 {random_ssh_dport} 已被此容器的其他规则使用。可尝试重新创建或手动添加其他端口。")
-                    else:
-                        logger.error(f"为容器 {hostname} 自动添加 SSH NAT 规则失败。外部端口: {random_ssh_dport}, 原因: {add_ssh_rule_result.get('msg')}")
-            except Exception as e_ssh_nat:
-                logger.error(f"为容器 {hostname} 自动添加 SSH NAT 规则时发生异常: {str(e_ssh_nat)}", exc_info=True)
-
             return {'code': 200, 'msg': '容器创建成功'}
-        except (LXDAPIException, Exception) as e:
-            error_type_msg = "LXD API错误" if isinstance(e, LXDAPIException) else "内部错误"
-            logger.error(f"创建容器 {hostname} 过程中发生{error_type_msg}: {str(e)}", exc_info=True)
-            if container_to_cleanup_on_error and self.client.containers.exists(container_to_cleanup_on_error.name):
-                 try:
-                     logger.info(f"创建过程中发生错误，尝试删除可能已部分创建的容器 {container_to_cleanup_on_error.name}")
-                     current_state = container_to_cleanup_on_error.state()
-                     if current_state.status and current_state.status.lower() == 'running':
-                         container_to_cleanup_on_error.stop(wait=True)
-                     container_to_cleanup_on_error.delete(wait=True)
-                     logger.info(f"部分创建的容器 {container_to_cleanup_on_error.name} 已删除。")
-                 except Exception as e_cleanup:
-                     logger.error(f"尝试清理部分创建的容器 {container_to_cleanup_on_error.name} 时失败: {e_cleanup}")
-            return {'code': 500, 'msg': f'{error_type_msg} (create): {str(e)}'}
-
+        except LXDAPIException as e:
+            logger.error(f"LXD API错误 (create container {hostname}): {e}")
+            return {'code': 500, 'msg': f'LXD API错误 (create): {e}'}
+        except Exception as e:
+            logger.error(f"创建容器 {hostname} 时发生内部错误: {str(e)}", exc_info=True)
+            return {'code': 500, 'msg': f'创建容器时发生内部错误: {str(e)}'}
 
     def delete_container(self, hostname):
         container = self._get_container_or_error(hostname)
@@ -278,28 +206,24 @@ class LXCManager:
         try:
             logger.info(f"开始删除容器 {hostname}")
 
-            logger.info(f"删除容器 {hostname} 前，清理其所有 NAT 规则")
-            rules_metadata_snapshot = _load_iptables_rules_metadata()
-            rules_for_this_host_to_delete = [
-                rule for rule in rules_metadata_snapshot if rule.get('hostname') == hostname
-            ]
-
-            if not rules_for_this_host_to_delete:
-                logger.info(f"容器 {hostname} 没有找到关联的 NAT 规则。")
-            else:
-                for rule_meta_to_delete in rules_for_this_host_to_delete:
-                    logger.info(f"准备删除容器 {hostname} 的iptables规则: {rule_meta_to_delete}")
-                    delete_attempt_result = self.delete_nat_rule_via_iptables(
+            rules_metadata = _load_iptables_rules_metadata()
+            rules_to_keep = []
+            rules_for_this_container_found = False
+            for rule_meta in rules_metadata:
+                if rule_meta.get('hostname') == hostname:
+                    logger.info(f"准备删除容器 {hostname} 的iptables规则: {rule_meta}")
+                    self.delete_nat_rule_via_iptables(
                         hostname,
-                        rule_meta_to_delete['dtype'],
-                        rule_meta_to_delete['dport'],
-                        rule_meta_to_delete['sport'],
-                        container_ip_at_creation_time=rule_meta_to_delete.get('container_ip')
+                        rule_meta['dtype'],
+                        rule_meta['dport'],
+                        rule_meta['sport'],
+                        container_ip_at_creation_time=rule_meta['container_ip']
                     )
-                    if delete_attempt_result.get('code') == 200:
-                        logger.info(f"成功删除 NAT 规则: {rule_meta_to_delete} for {hostname}")
-                    else:
-                        logger.warning(f"删除 NAT 规则 {rule_meta_to_delete} for {hostname} 可能失败. 原因: {delete_attempt_result.get('msg')}")
+                    rules_for_this_container_found = True
+                else:
+                    rules_to_keep.append(rule_meta)
+            if rules_for_this_container_found:
+                _save_iptables_rules_metadata(rules_to_keep)
 
             if container.status == 'Running':
                 logger.info(f"容器 {hostname} 正在运行，先停止...")
@@ -346,30 +270,42 @@ class LXCManager:
         container = self._get_container_or_error(hostname)
         if not container:
             return {'code': 404, 'msg': '容器未找到'}
-
-        current_status_check = container.state().status
-        if current_status_check.lower() != 'running':
-            logger.warning(f"尝试为容器 {hostname} 修改密码，但容器未运行 (状态: {current_status_check})")
-            return {'code': 400, 'msg': f'容器未运行 (状态: {current_status_check})'}
+        if container.status != 'Running':
+            return {'code': 400, 'msg': '容器未运行'}
         try:
             user = app_config.default_container_user
             logger.info(f"开始为容器 {hostname} 的用户 {user} 修改密码 (使用 bash -c 'echo ... | chpasswd')")
 
             escaped_new_password = shlex.quote(new_password)
             command_to_execute_in_bash = f"echo '{user}:{escaped_new_password}' | chpasswd"
-
+            
             logger.debug(f"在容器内执行命令: bash -c \"{command_to_execute_in_bash}\"")
             exit_code, stdout, stderr = container.execute(['bash', '-c', command_to_execute_in_bash])
-
+            
             if exit_code == 0:
                 logger.info(f"容器 {hostname} 密码使用 bash -c 'echo ... | chpasswd' 修改成功")
                 return {'code': 200, 'msg': '密码修改成功'}
             else:
-                err_msg_stdout = stdout.decode('utf-8', errors='ignore').strip() if stdout else ""
-                err_msg_stderr = stderr.decode('utf-8', errors='ignore').strip() if stderr else ""
+                err_msg_stdout = ""
+                if stdout:
+                    if isinstance(stdout, bytes):
+                        err_msg_stdout = stdout.decode('utf-8', errors='ignore').strip()
+                    else:
+                        err_msg_stdout = str(stdout).strip()
+                
+                err_msg_stderr = ""
+                if stderr:
+                    if isinstance(stderr, bytes):
+                        err_msg_stderr = stderr.decode('utf-8', errors='ignore').strip()
+                    else:
+                        err_msg_stderr = str(stderr).strip()
+
                 full_err_msg = []
-                if err_msg_stdout: full_err_msg.append(f"STDOUT: {err_msg_stdout}")
-                if err_msg_stderr: full_err_msg.append(f"STDERR: {err_msg_stderr}")
+                if err_msg_stdout:
+                    full_err_msg.append(f"STDOUT: {err_msg_stdout}")
+                if err_msg_stderr:
+                    full_err_msg.append(f"STDERR: {err_msg_stderr}")
+                
                 combined_err_msg = "; ".join(full_err_msg) if full_err_msg else "命令执行失败，但未提供具体错误信息"
                 logger.error(f"容器 {hostname} 使用 bash -c 'echo ... | chpasswd' 修改密码失败 (exit_code: {exit_code}): {combined_err_msg}")
                 return {'code': 500, 'msg': f'密码修改失败: {combined_err_msg}'}
@@ -384,46 +320,20 @@ class LXCManager:
         container = self._get_container_or_error(hostname)
         if not container: return {'code': 404, 'msg': '容器未找到'}
         logger.info(f"开始重装容器 {hostname} 为系统 {new_os_alias}")
-
         original_config_keys = ['limits.cpu', 'limits.memory', 'user.nat_acl_limit', 'user.flow_limit_gb', 'user.disk_size_mb']
+        if 'user.user-data' in container.config:
+            original_config_keys.append('user.user-data')
         original_devices_to_keep_config = ['eth0']
-
         preserved_config = {k: v for k, v in container.config.items() if k in original_config_keys}
         preserved_devices = {dev_name: dev_data for dev_name, dev_data in container.devices.items() if dev_name in original_devices_to_keep_config}
         new_root_size = self._get_user_metadata(container, 'disk_size_mb', '1024') + "MB"
-
         try:
             if container.status == 'Running':
                 logger.info(f"容器 {hostname}正在运行，重装前先停止...")
                 container.stop(wait=True)
-
-            logger.info(f"重装容器 {hostname} 前，清理其所有 NAT 规则")
-            rules_metadata_snapshot_reinstall = _load_iptables_rules_metadata()
-            rules_for_this_host_to_delete_reinstall = [
-                rule for rule in rules_metadata_snapshot_reinstall if rule.get('hostname') == hostname
-            ]
-
-            if not rules_for_this_host_to_delete_reinstall:
-                logger.info(f"容器 {hostname} (重装前) 没有找到关联的 NAT 规则。")
-            else:
-                for rule_meta_to_delete in rules_for_this_host_to_delete_reinstall:
-                    logger.info(f"准备删除容器 {hostname} (重装前) 的iptables规则: {rule_meta_to_delete}")
-                    delete_attempt_result = self.delete_nat_rule_via_iptables(
-                        hostname,
-                        rule_meta_to_delete['dtype'],
-                        rule_meta_to_delete['dport'],
-                        rule_meta_to_delete['sport'],
-                        container_ip_at_creation_time=rule_meta_to_delete.get('container_ip')
-                    )
-                    if delete_attempt_result.get('code') == 200:
-                        logger.info(f"成功删除 NAT 规则 (重装前): {rule_meta_to_delete} for {hostname}")
-                    else:
-                        logger.warning(f"删除 NAT 规则 (重装前) {rule_meta_to_delete} for {hostname} 可能失败. 原因: {delete_attempt_result.get('msg')}")
-
             logger.info(f"准备删除旧容器 {hostname}...")
             container.delete(wait=True)
             logger.info(f"旧容器 {hostname} 已删除，开始创建新容器...")
-
             reinstall_lxd_config = {
                 'name': hostname,
                 'source': {'type': 'image', 'alias': new_os_alias or app_config.default_image_alias},
@@ -431,40 +341,10 @@ class LXCManager:
                 'devices': preserved_devices
             }
             reinstall_lxd_config['devices']['root'] = {'path': '/', 'pool': app_config.storage_pool, 'size': new_root_size, 'type': 'disk'}
-
             new_container = self.client.containers.create(reinstall_lxd_config, wait=True)
             logger.info(f"新容器 {hostname} 配置完成，开始启动...")
             new_container.start(wait=True)
-            logger.info(f"容器 {hostname} 重装并启动成功. 密码需通过控制面板“修改密码”功能设置。")
-
-            try:
-                ssh_external_port_min_reinstall = 10000
-                ssh_external_port_max_reinstall = 65535
-                random_ssh_dport_reinstall = random.randint(ssh_external_port_min_reinstall, ssh_external_port_max_reinstall)
-                logger.info(f"尝试为重装后的容器 {hostname} 自动添加 SSH (端口 22) 的 NAT 规则，使用外部端口 {random_ssh_dport_reinstall}")
-
-                container_ip_for_nat_reinstall = None
-                nat_add_attempts_reinstall = 0
-                while not container_ip_for_nat_reinstall and nat_add_attempts_reinstall < 3:
-                    container_ip_for_nat_reinstall = self._get_container_ip(new_container)
-                    if container_ip_for_nat_reinstall: break
-                    logger.warning(f"为重装后的容器 {hostname} 获取IP失败 (尝试 {nat_add_attempts_reinstall+1}/3)，等待后重试...")
-                    time.sleep(5)
-                    nat_add_attempts_reinstall +=1
-
-                if not container_ip_for_nat_reinstall:
-                     logger.error(f"为重装后的容器 {hostname} 自动添加 SSH NAT 规则失败：多次尝试后仍无法获取容器IP地址。")
-                else:
-                    add_ssh_rule_result_reinstall = self.add_nat_rule_via_iptables(new_container.name, 'tcp', str(random_ssh_dport_reinstall), '22')
-                    if add_ssh_rule_result_reinstall.get('code') == 200:
-                        logger.info(f"成功为重装后的容器 {hostname} 自动添加 SSH NAT 规则: 外部端口 {random_ssh_dport_reinstall} -> 内部端口 22")
-                    elif add_ssh_rule_result_reinstall.get('code') == 409:
-                         logger.warning(f"尝试为重装后的容器 {hostname} 自动添加 SSH NAT 规则失败：外部端口 {random_ssh_dport_reinstall} 已被此容器的其他规则使用。可尝试手动添加其他端口。")
-                    else:
-                        logger.error(f"为重装后的容器 {hostname} 自动添加 SSH NAT 规则失败。外部端口: {random_ssh_dport_reinstall}, 原因: {add_ssh_rule_result_reinstall.get('msg')}")
-            except Exception as e_ssh_nat_reinstall:
-                logger.error(f"为重装后的容器 {hostname} 自动添加 SSH NAT 规则时发生异常: {str(e_ssh_nat_reinstall)}", exc_info=True)
-
+            logger.info(f"容器 {hostname} 重装并启动成功")
             return {'code': 200, 'msg': '系统重装成功'}
         except LXDAPIException as e:
             logger.error(f"LXD API错误 (reinstall {hostname}): {e}")
@@ -498,12 +378,9 @@ class LXCManager:
         rules_metadata = _load_iptables_rules_metadata()
         current_host_rules_count = sum(1 for r in rules_metadata if r.get('hostname') == hostname)
 
-        is_ssh_rule = (str(sport) == '22' and dtype.lower() == 'tcp')
-        if not is_ssh_rule and limit > 0 and current_host_rules_count >= limit :
+        if limit > 0 and current_host_rules_count >= limit:
             logger.warning(f"容器 {hostname} 已达到iptables NAT规则数量上限 ({limit}条)")
             return {'code': 403, 'msg': f'已达到NAT规则数量上限 ({limit}条)'}
-        elif is_ssh_rule and limit > 0 and current_host_rules_count >= limit:
-            logger.info(f"允许为容器 {hostname} 添加SSH (端口22) 的NAT规则，即使已达到或超过常规端口转发上限 ({current_host_rules_count}/{limit})。")
 
         for rule_meta in rules_metadata:
             if rule_meta.get('hostname') == hostname and \
@@ -521,7 +398,6 @@ class LXCManager:
         main_interface = getattr(app_config, 'main_interface', None)
         if not main_interface and not getattr(app_config, 'skip_masquerade', False):
              logger.error("配置文件中缺少 main_interface (主网卡名) for iptables MASQUERADE rule, 或设置 skip_masquerade: true")
-             return {'code': 500, 'msg': '服务器配置错误：缺少主网卡信息用于NAT'}
 
 
         rule_comment = f'lxd_controller_nat_{hostname}_{dtype.lower()}_{dport}'
@@ -537,6 +413,7 @@ class LXCManager:
         if not success_dnat:
             return {'code': 500, 'msg': f"添加DNAT规则失败: {msg_dnat}"}
 
+
         if main_interface and not getattr(app_config, 'skip_masquerade', False):
             masquerade_args = [
                 '-t', 'nat', '-A', 'POSTROUTING',
@@ -547,9 +424,8 @@ class LXCManager:
             ]
             success_masq, msg_masq = self._run_shell_command_for_iptables(masquerade_args)
             if not success_masq:
-                dnat_del_args = ['-t', 'nat', '-D', 'PREROUTING', '-d', host_listen_ip, '-p', dtype.lower(), '--dport', str(dport), '-j', 'DNAT', '--to-destination', f"{container_ip}:{sport}", '-m', 'comment', '--comment', rule_comment]
+                dnat_del_args = ['-t', 'nat', '-D'] + dnat_args[3:]
                 self._run_shell_command_for_iptables(dnat_del_args)
-                logger.error(f"添加MASQUERADE规则失败后，尝试回滚DNAT规则 for {rule_comment}")
                 return {'code': 500, 'msg': f"添加MASQUERADE规则失败: {msg_masq}"}
 
         new_rule_meta = {
@@ -563,43 +439,43 @@ class LXCManager:
         return {'code': 200, 'msg': 'NAT规则(iptables)添加成功'}
 
     def delete_nat_rule_via_iptables(self, hostname, dtype, dport, sport, container_ip_at_creation_time=None):
-        logger.info(f"为容器 {hostname} 通过iptables删除NAT规则: {dtype} {dport} -> {sport} (原始IP: {container_ip_at_creation_time})")
+        logger.info(f"为容器 {hostname} 通过iptables删除NAT规则: {dtype} {dport} -> {sport}")
         host_listen_ip = app_config.nat_listen_ip
         rules_metadata = _load_iptables_rules_metadata()
+        rules_to_keep = []
+        rule_found_and_deleted_from_iptables = False
 
         rule_to_delete_meta = None
-        rule_comment_to_use = f'lxd_controller_nat_{hostname}_{dtype.lower()}_{dport}'
+        for rule_meta_idx, rule_meta in enumerate(rules_metadata):
+            if rule_meta.get('hostname') == hostname and \
+               rule_meta.get('dtype', '').lower() == dtype.lower() and \
+               str(rule_meta.get('dport')) == str(dport):
+                rule_to_delete_meta = rule_meta; break
 
-        for idx, rule_meta_item in enumerate(rules_metadata):
-            if rule_meta_item.get('hostname') == hostname and \
-               rule_meta_item.get('dtype', '').lower() == dtype.lower() and \
-               str(rule_meta_item.get('dport')) == str(dport) and \
-               str(rule_meta_item.get('sport')) == str(sport) :
-                rule_to_delete_meta = rule_meta_item
-                rule_comment_to_use = rule_meta_item.get('rule_id', rule_comment_to_use)
-                if not container_ip_at_creation_time:
-                    container_ip_at_creation_time = rule_meta_item.get('container_ip')
-                break
 
         effective_container_ip = container_ip_at_creation_time
+        rule_comment_to_use = f'lxd_controller_nat_{hostname}_{dtype.lower()}_{dport}'
 
-        if not effective_container_ip and not rule_to_delete_meta :
-            container = self._get_container_or_error(hostname)
-            if container :
-                current_status_check = container.state().status
-                if current_status_check.lower() == 'running':
-                    effective_container_ip = self._get_container_ip(container)
-                    logger.info(f"无法从元数据或参数获取IP，使用当前运行容器IP: {effective_container_ip} for {hostname} {dtype} {dport}")
+        if rule_to_delete_meta:
+            if not effective_container_ip:
+                effective_container_ip = rule_to_delete_meta.get('container_ip')
+            rule_comment_to_use = rule_to_delete_meta.get('rule_id', rule_comment_to_use)
+        elif not effective_container_ip:
+            current_container = self._get_container_or_error(hostname)
+            if current_container:
+                effective_container_ip = self._get_container_ip(current_container)
 
         if not effective_container_ip:
-            logger.error(f"删除iptables规则失败: 无法确定容器IP for {hostname} {dtype} {dport} -> {sport}")
+            logger.error(f"无法确定删除规则所需的容器IP for {hostname} {dtype} {dport}")
             if rule_to_delete_meta:
-                 rules_metadata_after_delete = [r for r in rules_metadata if r.get('rule_id') != rule_comment_to_use]
+                 rules_metadata_after_delete = [r for r in rules_metadata if r.get('rule_id') != rule_comment_to_use and not (
+                    r.get('hostname') == hostname and r.get('dtype','').lower() == dtype.lower() and str(r.get('dport')) == str(dport)
+                 )]
                  if len(rules_metadata_after_delete) < len(rules_metadata):
                      _save_iptables_rules_metadata(rules_metadata_after_delete)
                      logger.info(f"从元数据中移除了 {rule_comment_to_use} (由于无法获取IP，仅操作元数据)")
                      return {'code': 200, 'msg': 'NAT规则元数据已移除，但因无法获取IP，iptables规则可能未删除'}
-            return {'code': 500, 'msg': '删除iptables规则失败: 无法确定容器IP且元数据中未找到特定规则信息'}
+            return {'code': 500, 'msg': '删除iptables规则失败: 无法确定容器IP且元数据未找到特定规则'}
 
         dnat_del_args = [
             '-t', 'nat', '-D', 'PREROUTING',
@@ -609,13 +485,12 @@ class LXCManager:
             '-m', 'comment', '--comment', rule_comment_to_use
         ]
         success_dnat, msg_dnat = self._run_shell_command_for_iptables(dnat_del_args)
-
-        rule_deleted_from_iptables_ok = False
         if success_dnat:
-            rule_deleted_from_iptables_ok = True
-            logger.info(f"DNAT规则 (comment: {rule_comment_to_use}) iptables删除成功")
+            rule_found_and_deleted_from_iptables = True
+            logger.info(f"DNAT规则 (comment: {rule_comment_to_use}) 删除成功或已不存在")
         else:
-            logger.warning(f"删除DNAT规则 (comment: {rule_comment_to_use}) 的iptables命令执行失败 (可能规则已不存在): {msg_dnat}")
+            logger.warning(f"删除DNAT规则 (comment: {rule_comment_to_use}) 可能失败 (或规则不存在): {msg_dnat}")
+
 
         main_interface = getattr(app_config, 'main_interface', None)
         if main_interface and not getattr(app_config, 'skip_masquerade', False):
@@ -628,43 +503,32 @@ class LXCManager:
             ]
             success_masq, msg_masq = self._run_shell_command_for_iptables(masquerade_del_args)
             if success_masq:
-                logger.info(f"MASQUERADE规则 (comment: {rule_comment_to_use}_masq) iptables删除成功")
+
+                logger.info(f"MASQUERADE规则 (comment: {rule_comment_to_use}_masq) 删除成功或已不存在")
             else:
-                logger.warning(f"删除MASQUERADE规则 (comment: {rule_comment_to_use}_masq) 的iptables命令执行失败 (可能规则已不存在): {msg_masq}")
+                logger.warning(f"删除MASQUERADE规则 (comment: {rule_comment_to_use}_masq) 可能失败 (或规则不存在): {msg_masq}")
 
         final_rules_to_keep = []
         deleted_from_meta = False
-        if rule_to_delete_meta:
-            for r_meta in rules_metadata:
-                if r_meta.get('rule_id') == rule_comment_to_use:
-                    deleted_from_meta = True
-                else:
-                    final_rules_to_keep.append(r_meta)
-        else:
-            logger.warning(f"尝试从元数据删除规则 {rule_comment_to_use}，但未在元数据中精确定位到此规则。将基于参数尝试过滤。")
-            for r_meta in rules_metadata:
-                if not (r_meta.get('hostname') == hostname and \
-                        r_meta.get('dtype', '').lower() == dtype.lower() and \
-                        str(r_meta.get('dport')) == str(dport) and \
-                        str(r_meta.get('sport')) == str(sport)):
-                    final_rules_to_keep.append(r_meta)
-                else:
-                    deleted_from_meta = True
+        for rule_meta_item in rules_metadata:
+
+            if not (rule_meta_item.get('hostname') == hostname and \
+                    rule_meta_item.get('dtype', '').lower() == dtype.lower() and \
+                    str(rule_meta_item.get('dport')) == str(dport) and \
+                    (rule_to_delete_meta is None or rule_meta_item.get('rule_id') == rule_comment_to_use)):
+                final_rules_to_keep.append(rule_meta_item)
+            else:
+                deleted_from_meta = True
 
         if deleted_from_meta:
             _save_iptables_rules_metadata(final_rules_to_keep)
-            logger.info(f"从元数据中移除规则: {rule_comment_to_use if rule_to_delete_meta else '匹配参数的规则'}")
-        else:
-             logger.info(f"元数据中未找到与 {rule_comment_to_use} (或给定参数) 完全匹配的规则，无需从元数据删除。")
-
-        final_check_metadata = _load_iptables_rules_metadata()
-        still_in_meta = any(r.get('rule_id') == rule_comment_to_use for r in final_check_metadata) or \
-                        any(r.get('hostname') == hostname and r.get('dtype','').lower() == dtype.lower() and str(r.get('dport')) == str(dport) and str(r.get('sport')) == str(sport) for r in final_check_metadata)
+            logger.info(f"从元数据中移除规则: {rule_comment_to_use}")
+        elif not rule_to_delete_meta:
+             logger.info(f"元数据中未找到规则 {rule_comment_to_use}，无需从元数据删除")
 
 
-        if not still_in_meta:
-             logger.info(f"规则 {rule_comment_to_use} 已成功从元数据中移除或之前不存在。")
-             return {'code': 200, 'msg': 'NAT规则(iptables)删除尝试完成, 规则已从元数据移除'}
-        else:
-             logger.warning(f"规则 {rule_comment_to_use} 在尝试删除后似乎仍在元数据中。iptables删除命令状态: {success_dnat}")
-             return {'code': 500, 'msg': 'NAT规则(iptables)删除尝试部分失败，规则可能仍在元数据或iptables中'}
+        if not rule_found_and_deleted_from_iptables and not deleted_from_meta and not rule_to_delete_meta :
+            return {'code': 404, 'msg': 'NAT规则未找到 (iptables和元数据均未找到或删除失败)'}
+
+        logger.info(f"容器 {hostname} 通过iptables删除DNAT/MASQUERADE规则尝试完成")
+        return {'code': 200, 'msg': 'NAT规则(iptables)删除尝试完成'}
