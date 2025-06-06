@@ -186,7 +186,7 @@ class LXCManager:
             logger.info(f"开始创建容器 {hostname} 使用配置: {container_config_obj}")
             container = self.client.containers.create(container_config_obj, wait=True)
             container_to_cleanup_on_error = container
-            
+
             self._set_user_metadata(container, 'nat_acl_limit', params.get('ports', 0))
             self._set_user_metadata(container, 'flow_limit_gb', params.get('bandwidth', 0))
             self._set_user_metadata(container, 'disk_size_mb', params.get('disk', '1024'))
@@ -380,7 +380,7 @@ class LXCManager:
             logger.error(f"修改密码 for {hostname} 时发生内部错误: {str(e)}", exc_info=True)
             return {'code': 500, 'msg': f'修改密码时发生内部错误: {str(e)}'}
 
-    def reinstall_container(self, hostname, new_os_alias):
+    def reinstall_container(self, hostname, new_os_alias, new_password):
         container = self._get_container_or_error(hostname)
         if not container: return {'code': 404, 'msg': '容器未找到'}
         logger.info(f"开始重装容器 {hostname} 为系统 {new_os_alias}")
@@ -435,7 +435,40 @@ class LXCManager:
             new_container = self.client.containers.create(reinstall_lxd_config, wait=True)
             logger.info(f"新容器 {hostname} 配置完成，开始启动...")
             new_container.start(wait=True)
-            logger.info(f"容器 {hostname} 重装并启动成功. 密码需通过控制面板“修改密码”功能设置。")
+            logger.info(f"容器 {hostname} 重装并启动成功.")
+
+            logger.info(f"重装后的容器 {hostname} 已启动，准备设置密码...")
+            time.sleep(10)
+
+            if not new_password:
+                logger.error(f"为重装后的容器 {hostname} 设置密码失败：未提供密码。")
+            else:
+                user_for_password = app_config.default_container_user
+                try:
+                    logger.info(f"为重装后的容器 {hostname} 的用户 {user_for_password} 设置密码 (使用 bash -c 'echo ... | chpasswd')")
+                    escaped_new_password = shlex.quote(new_password)
+                    command_to_execute_in_bash = f"echo '{user_for_password}:{escaped_new_password}' | chpasswd"
+                    logger.debug(f"在容器内执行命令: bash -c \"{command_to_execute_in_bash}\"")
+
+                    current_status_check = new_container.state().status
+                    if current_status_check.lower() != 'running':
+                        logger.error(f"重装后的容器 {hostname} 未处于运行状态 (当前状态: {current_status_check})，无法设置密码。")
+                    else:
+                        exit_code, stdout, stderr = new_container.execute(['bash', '-c', command_to_execute_in_bash])
+                        if exit_code == 0:
+                            logger.info(f"重装后的容器 {hostname} 密码使用 bash -c 'echo ... | chpasswd' 设置成功")
+                        else:
+                            err_msg_stdout = stdout.decode('utf-8', errors='ignore').strip() if stdout else ""
+                            err_msg_stderr = stderr.decode('utf-8', errors='ignore').strip() if stderr else ""
+                            full_err_msg = []
+                            if err_msg_stdout: full_err_msg.append(f"STDOUT: {err_msg_stdout}")
+                            if err_msg_stderr: full_err_msg.append(f"STDERR: {err_msg_stderr}")
+                            combined_err_msg = "; ".join(full_err_msg) if full_err_msg else "命令执行失败，但未提供具体错误信息"
+                            logger.error(f"重装后的容器 {hostname} 设置密码失败 (exit_code: {exit_code}): {combined_err_msg}")
+                except LXDAPIException as e_passwd:
+                    logger.error(f"为重装后的容器 {hostname} 设置密码时发生LXD API错误: {e_passwd}")
+                except Exception as e_passwd_generic:
+                    logger.error(f"为重装后的容器 {hostname} 设置密码时发生未知错误: {e_passwd_generic}", exc_info=True)
 
             try:
                 ssh_external_port_min_reinstall = 10000
