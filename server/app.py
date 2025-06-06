@@ -112,14 +112,16 @@ def api_reinstall():
         payload = request.json
         hostname = payload.get('hostname')
         new_os = payload.get('system')
-        if not hostname or not new_os:
-            logger.warning(f"API /api/reinstall 调用缺少hostname或system参数. Payload: {payload}")
-            return jsonify({'code': 400, 'msg': '缺少hostname或system参数'}), 400
+        new_password = payload.get('password') # 新增：获取密码
+        if not all([hostname, new_os, new_password]): # 更新：检查密码
+            logger.warning(f"API /api/reinstall 调用缺少hostname, system或password参数. Payload: {payload}")
+            return jsonify({'code': 400, 'msg': '缺少hostname, system或password参数'}), 400
         logger.info(f"请求reinstall for: {hostname} with OS: {new_os}")
-        return jsonify(lxc_manager.reinstall_container(hostname, new_os))
+        # 更新：在调用时传递密码
+        return jsonify(lxc_manager.reinstall_container(hostname, new_os, new_password))
     except Exception as e:
         logger.error(f"处理 /api/reinstall 时发生意外错误: {e}", exc_info=True)
-        return jsonify({'code': 500, 'msg': '服务器内部错误'}), 500
+        return jsonify({'code': 500, 'msg': f'服务器内部错误: {e}'}), 500
 
 
 @app.route('/api/natlist', methods=['GET'])
