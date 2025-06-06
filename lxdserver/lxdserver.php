@@ -219,7 +219,6 @@ function lxdserver_CreateAccount($params)
             'dedicatedip'  => $params['server_ip'],
             'domainstatus' => 'Active',
             'username'     => $params['domain'],
-            // 'password'     => $sys_pwd, // 根据PVE插件的逻辑，注释掉此行，不再更新密码，让面板保留其初始值
         ];
 
         if (!empty($res['data']['ssh_port'])) {
@@ -445,6 +444,8 @@ function lxdserver_Reinstall($params)
     if (empty($params['reinstall_os'])) {
         return ['status' => 'error', 'msg' => '操作系统参数错误'];
     }
+    
+    $reinstall_pass = $params['password'] ?? randStr(8);
 
     $data = [
         'url'  => '/api/reinstall',
@@ -452,6 +453,7 @@ function lxdserver_Reinstall($params)
         'data' => [
             'hostname' => $params['domain'],
             'system'   => $params['reinstall_os'],
+            'password' => $reinstall_pass,
         ],
     ];
     $res = lxdserver_JSONCurl($params, $data, 'POST');
