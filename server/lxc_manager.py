@@ -112,8 +112,18 @@ class LXCManager:
         if not container:
             return {'code': 404, 'msg': '容器未找到'}
         try:
+            state_before = container.state()
+            time.sleep(1)
             state = container.state()
             config = container.config
+            cpu_cores = int(config.get('limits.cpu', '1'))
+            cpu_usage_before = state_before.cpu.get('usage', 0)
+            cpu_usage_after = state.cpu.get('usage', 0)
+            cpu_usage_diff_ns = cpu_usage_after - cpu_usage_before
+            cpu_percent = 0
+            if cpu_cores > 0:
+                total_possible_ns = 1_000_000_000 * cpu_cores
+                cpu_percent = round((cpu_usage_diff_ns / total_possible_ns) * 100, 2)
             total_ram_mb = 0
             mem_limit = config.get('limits.memory', '0MB')
             if mem_limit.upper().endswith('MB'): total_ram_mb = int(mem_limit[:-2])
@@ -138,6 +148,7 @@ class LXCManager:
             used_flow_gb = round(bytes_total / (1024*1024*1024), 2)
             data = {
                 'Hostname': hostname, 'Status': lxc_status,
+                'UsedCPU': cpu_percent,
                 'TotalRam': total_ram_mb, 'UsedRam': used_ram_mb,
                 'TotalDisk': total_disk_mb, 'UsedDisk': used_disk_mb,
                 'IP': self._get_container_ip(container) or 'N/A',
@@ -697,7 +708,7 @@ class LXCManager:
 
         if not still_in_meta:
              logger.info(f"规则 {rule_comment_to_use} 已成功从元数据中移除或之前不存在。")
-             return {'code': 200, 'msg': 'NAT规则(iptables)删除尝试完成, 规则已从元数据移除'}
+             return {'code': 200, 'msg': 'NAT规则(iptables)删除尝试完成'}
         else:
              logger.warning(f"规则 {rule_comment_to_use} 在尝试删除后似乎仍在元数据中。iptables删除命令状态: {success_dnat}")
              return {'code': 500, 'msg': 'NAT规则(iptables)删除尝试部分失败，规则可能仍在元数据或iptables中'}
