@@ -12,18 +12,22 @@
 .container {
   width: 100vw;
 }
+
 .public_title {
   display: flex;
   justify-content: space-between;
 }
+
 .public_title_text {
   font-size: 16px;
   line-height: 28px;
   font-weight: bold;
 }
+
 .public_title_ul {
   list-style: none;
 }
+
 .public_title_ul > li {
   width: 4px;
   height: 4px;
@@ -33,6 +37,8 @@
   border-radius: 50%;
   transition: all 0.2s;
 }
+
+
 .btn_main {
   outline: none;
   width: 100px;
@@ -42,11 +48,13 @@
   color: #fff;
   transition: all 0.2s;
 }
+
 .purple {
   background-color: #2f54ea;
   border: 1px solid #2f54ea;
   border-radius: 4px;
 }
+
 .purple:hover {
   background-color: #99b7fd !important;
 }
@@ -55,135 +63,112 @@
   color: red;
   margin-left: 15px;
 }
-.card-body {
-    padding: 1.25rem;
-}
-.shadow {
-    box-shadow: 0 .15rem 1.75rem 0 rgba(58,59,69,.15)!important;
-}
-.font-weight-bold {
-    font-weight: 700!important;
-}
-.py-3 {
-    padding-top: .75rem!important;
-    padding-bottom: .75rem!important;
-}
 </style>
-
-<div class="card shadow mb-4">
-    <div class="card-header py-3">
-        <h6 class="m-0 font-weight-bold text-primary">NAT转发规则</h6>
-    </div>
-    <div class="card-body">
-
-        <div class="NAT_btn">
-          <button type="button" class="btn btn-primary waves-effect waves-light" data-toggle="modal" data-target="#addModallxdserveracl">创建</button>
-          <button type="button" class="btn btn-info waves-effect waves-light" onclick="location.reload()" style="margin-left: 10px;">刷新数据</button>
-          <div class="table-note">提醒：表格操作后需要手动刷新读取数据。</div>
+<div class="NAT_btn">
+  <button type="button" class="btn btn-primary waves-effect waves-light" data-toggle="modal" data-target="#addModallxdserveracl">创建</button>
+  <button type="button" class="btn btn-info waves-effect waves-light" onclick="location.reload()" style="margin-left: 10px;">刷新数据</button>
+  <div class="table-note">提醒：表格操作后需要手动刷新读取数据。</div>
+</div>
+<div class="container">
+  <div class="modal fade" id="addModallxdserveracl">
+    <div class="modal-dialog">
+      <div class="modal-content">
+        <div class="modal-header">
+          <span class="modal-title">创建NAT转发</span>
+          <button type="button" class="close" data-dismiss="modal" onclick="closeAddModal()">&times;</button>
         </div>
-        <div class="container">
-          <div class="modal fade" id="addModallxdserveracl">
-            <div class="modal-dialog">
-              <div class="modal-content">
-                <div class="modal-header">
-                  <span class="modal-title">创建NAT转发</span>
-                  <button type="button" class="close" data-dismiss="modal" onclick="closeAddModal()">×</button>
-                </div>
-                <div class="modal-body">
-                  <div class="modal_limit">
-                    <div class="modal_main">
-                      <form>
-                        <div class="form-group">
-                          <label for="name">
-                          <div class="form-group">
-                            <label for="externalPort">
-                              <span style="color:#f00">*</span>
-                              外网端口</label>
-                            <input required name="dport" type="number" class="form-control" min="10000" max="65535" id="dportinput" placeholder="请输入外部端口(10000-65535)">
-                            <div class="invalid-feedback" id="externalPort-feedbacklxdserveracl"></div>
-                          </div>
-                          <div class="form-group">
-                            <label for="internalPort">
-                              <span style="color:#f00">*</span>
-                              内网端口</label>
-                            <input required name="sport" type="number" class="form-control" min="1" max="65535"
-                              id="sportinput" placeholder="请输入内部端口(1-65535)">
-                            <div class="invalid-feedback" id="internalPort-feedbacklxdserveracl"></div>
-                          </div>
-                          <div class="form-group">
-                            <label for="nokvmprotocollxdserveracl">
-                              <span style="color:#f00">*</span>
-                              映射类型</label>
+        <div class="modal-body">
+          <div class="modal_limit">
+            <div class="modal_main">
+              <form>
+                <div class="form-group">
+                  <label for="name">
+                  <div class="form-group">
+                    <label for="externalPort">
+                      <span style="color:#f00">*</span>
+                      外网端口</label>
+                    <input required name="dport" type="number" class="form-control" min="10000" max="65535" id="dportinput" placeholder="请输入外部端口(10000-65535)">
+                    <div class="invalid-feedback" id="externalPort-feedbacklxdserveracl"></div>
+                  </div>
+                  <div class="form-group">
+                    <label for="internalPort">
+                      <span style="color:#f00">*</span>
+                      内网端口</label>
+                    <input required name="sport" type="number" class="form-control" min="1" max="65535"
+                      id="sportinput" placeholder="请输入内部端口(1-65535)">
+                    <div class="invalid-feedback" id="internalPort-feedbacklxdserveracl"></div>
+                  </div>
+                  <div class="form-group">
+                    <label for="nokvmprotocollxdserveracl">
+                      <span style="color:#f00">*</span>
+                      映射类型</label>
 
-                            <div class="selectItem">
-                              <div class="protocol nokvmprotocollxdserveracl">
-                                <div class="filter-text">
-                                  <input class="filter-title" type="text" readonly placeholder="TCP" />
-                                  <i class="icon icon-filter-arrow"></i>
-                                </div>
-                                <select name="dtype">
-                                  <option value="tcp" selected>TCP</option>
-                                  <option value="udp">UDP</option>
-                                </select>
-                              </div>
-                            </div>
-                          </div>
-                      </form>
-                    </div>
-                    <div class="modal-footer">
-                      <button type="button" class="btn btn-primary waves-effect waves-light confirm-btnlxdserveracl"
-                        style="margin-left:10px" onclick="checkFormlxdserveracl()">确定</button>
+                    <div class="selectItem">
+                      <div class="protocol nokvmprotocollxdserveracl">
+                        <div class="filter-text">
+                          <input class="filter-title" type="text" readonly placeholder="TCP" />
+                          <i class="icon icon-filter-arrow"></i>
+                        </div>
+                        <select name="dtype">
+                          <option value="tcp" selected>TCP</option>
+                          <option value="udp">UDP</option>
+                        </select>
+                      </div>
                     </div>
                   </div>
-                </div>
-              </div>
+              </form>
+            </div>
+            <div class="modal-footer">
+              <button type="button" class="btn btn-primary waves-effect waves-light confirm-btnlxdserveracl"
+                style="margin-left:10px" onclick="checkFormlxdserveracl()">确定</button>
             </div>
           </div>
         </div>
-        <div class="table-responsive">
-        <table class="table mb-0 mt-3">
-          <thead>
-            <tr>
-              <th>外网端口</th>
-              <th>内网端口</th>
-              <th>协议</th>
-              <th style="width:90px">管理</th>
-            </tr>
-          </thead>
-
-          <tbody>
-            {foreach $list as $list_item }
-            <tr>
-              <td>{$list_item.Dport}</td>
-              <td>{$list_item.Sport}</td>
-              <td>{$list_item.Dtype}</td>
-              <td>
-                <button type="button" class="btn btn-link deleteNATlxdserveracl" data-id="{$list_item.ID}" onclick="edit(this)">删除</button>
-              </td>
-            </tr>
-            {/foreach}
-          </tbody>
-        </table>
-        </div>
-        <div style="display: none" id="loading-circlelxdserveracl">
-          <div class="loading_limit">
-            <div class="loading_inner">
-              <div></div>
-              <div></div>
-              <div></div>
-              <div></div>
-              <div></div>
-              <div></div>
-              <div></div>
-              <div></div>
-              <div></div>
-              <div></div>
-            </div>
-          </div>
-        </div>
+      </div>
     </div>
+  </div>
 </div>
+<div class="table-responsive">
+<table class="table mb-0 mt-3">
+  <thead>
+    <tr>
+      <th>外网端口</th>
+      <th>内网端口</th>
+      <th>协议</th>
+      <th style="width:90px">管理</th>
+    </tr>
+  </thead>
 
+  <tbody>
+    {foreach $list as $list_item }
+    <tr>
+      <td>{$list_item.Dport}</td>
+      <td>{$list_item.Sport}</td>
+      <td>{$list_item.Dtype}</td>
+      <td>
+        <button type="button" class="btn btn-link deleteNATlxdserveracl" data-id="{$list_item.ID}" onclick="edit(this)">删除</button>
+      </td>
+    </tr>
+    {/foreach}
+  </tbody>
+</table>
+</div>
+<div style="display: none" id="loading-circlelxdserveracl">
+  <div class="loading_limit">
+    <div class="loading_inner">
+      <div></div>
+      <div></div>
+      <div></div>
+      <div></div>
+      <div></div>
+      <div></div>
+      <div></div>
+      <div></div>
+      <div></div>
+      <div></div>
+    </div>
+  </div>
+</div>
 <script>
 ; jQuery.fn.selectFilter = function (options) {
 	var defaults = {
@@ -258,6 +243,7 @@
 		};
 	}
 };
+
 </script>
 <script>
   var dportval, sportval, dtypeval;
@@ -423,7 +409,7 @@
         success: function (data) {
           current_button.html('确认');
           current_button.data('submit', '');
-
+          
           const isSpecificCreationSuccessMessage = data.msg === 'NAT规则(iptables)添加成功';
           const finalCreationTitle = isSpecificCreationSuccessMessage ? 'NAT规则(iptables)添加成功' : (data.msg || '创建成功!');
 
@@ -433,7 +419,7 @@
             closeAddModal();
             Swal.fire({
               icon: 'success',
-              title: finalCreationTitle,
+              title: finalCreationTitle, 
               text: '操作成功，列表数据可能需要手动刷新以查看更新。',
               showConfirmButton: true,
               confirmButtonText: 'OK',
