@@ -1,5 +1,4 @@
 let captchaAnswer = 0;
-let statsInterval = null;
 
 function generateCaptcha() {
     const num1 = Math.ceil(Math.random() * 9) + 1;
@@ -293,8 +292,6 @@ function showInfo(containerName, buttonElement) {
     const natRulesError = $('#natRulesError');
     const infoError = $('#infoError');
     const infoModal = new bootstrap.Modal(document.getElementById('infoModal'));
-    const liveStatsSection = $('#liveStatsSection');
-    const liveStatsError = $('#liveStatsError');
 
     $('#infoModalLabel').text(`容器信息: ${containerName}`);
     basicInfoContent.html('正在加载基础信息...');
@@ -302,8 +299,6 @@ function showInfo(containerName, buttonElement) {
     natRulesError.addClass('d-none').text('');
     infoError.addClass('d-none').text('');
     natRulesListContainer.show();
-    liveStatsSection.hide();
-    liveStatsError.addClass('d-none').text('');
 
     setButtonProcessing(buttonElement, true);
     
@@ -319,68 +314,15 @@ function showInfo(containerName, buttonElement) {
                  return;
              }
 
-            let limitsHtml = '<h6>资源限制:</h6><ul class="list-unstyled">';
-            let hasLimits = false;
-            if (data.config && data.config['limits.cpu']) {
-                limitsHtml += `<li><strong>CPU 核心数:</strong> ${data.config['limits.cpu']}</li>`;
-                hasLimits = true;
-            }
-            if (data.config && data.config['limits.cpu.allowance']) {
-                limitsHtml += `<li><strong>CPU 占用率:</strong> ${data.config['limits.cpu.allowance']}</li>`;
-                hasLimits = true;
-            }
-             if (data.config && data.config['limits.memory']) {
-                limitsHtml += `<li><strong>内存:</strong> ${data.config['limits.memory']}</li>`;
-                hasLimits = true;
-            }
-             if (data.config && data.config['limits.memory.swap']) {
-                limitsHtml += `<li><strong>启用 Swap:</strong> ${data.config['limits.memory.swap']}</li>`;
-                hasLimits = true;
-            }
-            if (data.config && data.config['security.nesting']) {
-                limitsHtml += `<li><strong>允许嵌套:</strong> ${data.config['security.nesting']}</li>`;
-                hasLimits = true;
-            }
-            let rootDiskSize = '默认';
-            if(data.devices && data.devices.root && data.devices.root.size) {
-                 rootDiskSize = data.devices.root.size;
-                 hasLimits = true;
-            }
-            limitsHtml += `<li><strong>硬盘 (root):</strong> ${rootDiskSize}</li>`;
-
-            if (!hasLimits && rootDiskSize === '默认') {
-                 limitsHtml += '<li>未设置特定资源限制。</li>';
-            }
-            limitsHtml += '</ul>';
-
             let infoHtml = `
                 <p><strong>名称:</strong> ${data.name}</p>
-                <p><strong>状态:</strong> <span class="badge bg-${data.status === 'Running' ? 'success' : data.status === 'Stopped' ? 'danger' : 'secondary'}">${data.status}</span> (代码: ${data.status_code})</p>
+                <p><strong>状态:</strong> <span class="badge bg-${data.status === 'Running' ? 'success' : data.status === 'Stopped' ? 'danger' : 'secondary'}">${data.status}</span></p>
                 <p><strong>IP 地址:</strong> ${data.ip && data.ip !== 'N/A' ? data.ip : '-'}</p>
-                <p><strong>镜像来源/描述:</strong> ${data.description && data.description !== 'N/A' ? data.description : data.image_source && data.image_source !== 'N/A' ? data.image_source : 'N/A'}</p>
-                <p><strong>创建时间:</strong> ${data.created_at ? data.created_at.split('T')[0] : 'N/A'}</p>
+                <p><strong>镜像:</strong> ${data.description && data.description !== 'N/A' ? data.description : data.image_source && data.image_source !== 'N/A' ? data.image_source : 'N/A'}</p>
                 <p><strong>架构:</strong> ${data.architecture && data.architecture !== 'N/A' ? data.architecture : 'N/A'}</p>
-                <p><strong>类型:</strong> ${data.type}</p>
-                 <p><strong>临时容器:</strong> ${data.ephemeral ? '是' : '否'}</p>
-                <p><strong>配置文件:</strong> ${data.profiles.join(', ') || '无'}</p>
-                ${limitsHtml}
-                 <p class="mt-3"><small>${data.message}</small></p>
+                <p><strong>创建时间:</strong> ${data.created_at ? data.created_at.split('T')[0] : 'N/A'}</p>
             `;
             basicInfoContent.html(infoHtml);
-            
-            if (data.live_data_available) {
-                $('#total-mem').text(data.total_ram_mb);
-                $('#total-disk').text(data.total_disk_mb);
-                $('#total-flow').text(data.flow_limit_gb > 0 ? data.flow_limit_gb : '无限制');
-                
-                liveStatsSection.show();
-                updateLiveStats(containerName);
-
-                if (statsInterval) clearInterval(statsInterval);
-                statsInterval = setInterval(() => {
-                    updateLiveStats(containerName);
-                }, 2000);
-            }
             
             loadNatRules(containerName);
         },
@@ -400,28 +342,6 @@ function showInfo(containerName, buttonElement) {
         complete: function() {
             setButtonProcessing(buttonElement, false);
             infoModal.show();
-        }
-    });
-}
-
-function updateLiveStats(containerName) {
-    const liveStatsError = $('#liveStatsError');
-    $.ajax({
-        url: `/container/${containerName}/stats`,
-        type: 'GET',
-        success: function(stats) {
-            liveStatsError.addClass('d-none');
-            $('#live-cpu').text(stats.cpu_usage_percent);
-            $('#live-mem').text(stats.memory_usage_mb);
-            $('#live-disk').text(stats.disk_usage_mb);
-            $('#live-net-rx').text(stats.network_rx_kbps);
-            $('#live-net-tx').text(stats.network_tx_kbps);
-            $('#live-flow').text(stats.total_flow_used_gb);
-        },
-        error: function(jqXHR) {
-            const message = jqXHR.responseJSON ? jqXHR.responseJSON.message : "获取实时状态失败";
-            liveStatsError.removeClass('d-none').text(`错误: ${message}`);
-            if (statsInterval) clearInterval(statsInterval);
         }
     });
 }
@@ -574,15 +494,9 @@ $('#sshModal').on('hidden.bs.modal', function () {
 
 
 $('#infoModal').on('hidden.bs.modal', function () {
-    if (statsInterval) {
-        clearInterval(statsInterval);
-        statsInterval = null;
-    }
     $('#basicInfoContent').html('正在加载基础信息...');
     $('#natRulesContent').html('<li>正在加载 NAT 规则...</li>');
     $('#natRulesError').addClass('d-none').text('');
     $('#infoError').addClass('d-none').text('');
     $('#infoModalLabel').text('容器信息');
-    $('#natRulesList').show();
-    $('#liveStatsSection').hide();
 });

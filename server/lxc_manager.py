@@ -154,6 +154,26 @@ class LXCManager:
             else:
                 created_at_str = str(created_at_val) if created_at_val else None
 
+            # --- NEW LOGIC TO GET IMAGE ALIAS ---
+            image_source_alias = 'N/A'
+            container_fingerprint = container.config.get('volatile.base_image')
+            if container_fingerprint:
+                try:
+                    image = self.client.images.get(container_fingerprint)
+                    if image.aliases:
+                        image_source_alias = image.aliases[0]['name']
+                    else:
+                        image_source_alias = image.properties.get('description', container_fingerprint)
+                except NotFound:
+                    logger.warning(f"镜像指纹 {container_fingerprint} 未找到 (容器: {hostname})")
+                    image_source_alias = container.config.get('image.description', 'N/A')
+                except Exception as e:
+                    logger.error(f"获取容器 {hostname} 的镜像别名时出错: {e}")
+                    image_source_alias = container.config.get('image.description', 'N/A')
+            else:
+                image_source_alias = container.config.get('image.description', 'N/A')
+            # --- END OF NEW LOGIC ---
+
             data = {
                 'Hostname': hostname, 'Status': lxc_status,
                 'UsedCPU': cpu_percent,
@@ -164,6 +184,7 @@ class LXCManager:
                 'Bandwidth': flow_limit_gb,
                 'UseBandwidth': used_flow_gb, # For lxdserver module
                 'UseBandwidth_GB': used_flow_gb, # For new web UI
+                'ImageSourceAlias': image_source_alias, # <-- ADDED NEW FIELD
                 'raw_lxd_info': {
                     'name': container.name,
                     'status': container.status,

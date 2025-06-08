@@ -200,6 +200,7 @@ def container_info(name):
         'config': raw_data.get('config', {}),
         'devices': raw_data.get('devices', {}),
         'state': raw_data.get('state', {}),
+        'image_source': lxc_data.get('ImageSourceAlias'), # <-- MODIFIED THIS LINE
         'description': raw_data.get('description'),
         'ip': lxc_data.get('IP'),
         'total_ram_mb': lxc_data.get('TotalRam', 0),
