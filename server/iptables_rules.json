@@ -1,0 +1,34 @@
+[
+    {
+        "hostname": "ser579429654023",
+        "dtype": "tcp",
+        "dport": "43340",
+        "sport": "22",
+        "container_ip": "10.236.71.82",
+        "rule_id": "lxd_controller_nat_ser579429654023_tcp_43340"
+    },
+    {
+        "hostname": "ser614105641476",
+        "dtype": "tcp",
+        "dport": "22568",
+        "sport": "22",
+        "container_ip": "10.236.71.134",
+        "rule_id": "lxd_controller_nat_ser614105641476_tcp_22568"
+    },
+    {
+        "hostname": "ser743584634485",
+        "dtype": "tcp",
+        "dport": "42345",
+        "sport": "22",
+        "container_ip": "10.236.71.46",
+        "rule_id": "lxd_controller_nat_ser743584634485_tcp_42345"
+    },
+    {
+        "hostname": "ser743584634485",
+        "dtype": "tcp",
+        "dport": "23123",
+        "sport": "23",
+        "container_ip": "10.236.71.46",
+        "rule_id": "lxd_controller_nat_ser743584634485_tcp_23123"
+    }
+]

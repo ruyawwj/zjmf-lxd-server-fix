@@ -8,6 +8,7 @@ import os
 import shlex
 import random
 import time
+import datetime
 
 logger = logging.getLogger(__name__)
 
@@ -146,14 +147,42 @@ class LXCManager:
                         bytes_total += nic_data['counters'].get('bytes_received', 0)
                         bytes_total += nic_data['counters'].get('bytes_sent', 0)
             used_flow_gb = round(bytes_total / (1024*1024*1024), 2)
+            
+            created_at_val = container.created_at
+            if isinstance(created_at_val, datetime.datetime):
+                created_at_str = created_at_val.isoformat()
+            else:
+                created_at_str = str(created_at_val) if created_at_val else None
+
             data = {
                 'Hostname': hostname, 'Status': lxc_status,
                 'UsedCPU': cpu_percent,
+                'CPUCores': cpu_cores, # Added for lxdserver module
                 'TotalRam': total_ram_mb, 'UsedRam': used_ram_mb,
                 'TotalDisk': total_disk_mb, 'UsedDisk': used_disk_mb,
                 'IP': self._get_container_ip(container) or 'N/A',
                 'Bandwidth': flow_limit_gb,
-                'UseBandwidth': used_flow_gb,
+                'UseBandwidth': used_flow_gb, # For lxdserver module
+                'UseBandwidth_GB': used_flow_gb, # For new web UI
+                'raw_lxd_info': {
+                    'name': container.name,
+                    'status': container.status,
+                    'status_code': state.status_code,
+                    'type': 'container',
+                    'architecture': container.architecture,
+                    'ephemeral': container.ephemeral,
+                    'created_at': created_at_str,
+                    'profiles': container.profiles,
+                    'config': container.config,
+                    'devices': container.devices,
+                    'state': {
+                         'cpu': state.cpu,
+                         'disk': state.disk,
+                         'memory': state.memory,
+                         'network': state.network
+                    },
+                    'description': container.description
+                }
             }
             return {'code': 200, 'msg': '获取成功', 'data': data}
         except LXDAPIException as e:
@@ -162,6 +191,62 @@ class LXCManager:
         except Exception as e:
             logger.error(f"获取信息时发生内部错误 for {hostname}: {str(e)}", exc_info=True)
             return {'code': 500, 'msg': f'获取信息时发生内部错误: {str(e)}'}
+
+    def get_container_realtime_stats(self, hostname):
+        container = self._get_container_or_error(hostname)
+        if not container:
+            return {'code': 404, 'msg': '容器未找到'}
+        if container.status != 'Running':
+            return {'code': 400, 'msg': '容器未运行'}
+        try:
+            state_before = container.state()
+            time.sleep(1)
+            state_after = container.state()
+            cpu_cores = int(container.config.get('limits.cpu', '1'))
+            cpu_usage_before = state_before.cpu.get('usage', 0)
+            cpu_usage_after = state_after.cpu.get('usage', 0)
+            cpu_usage_diff_ns = cpu_usage_after - cpu_usage_before
+            cpu_percent = 0
+            if cpu_cores > 0:
+                total_possible_ns = 1_000_000_000 * cpu_cores
+                cpu_percent = round((cpu_usage_diff_ns / total_possible_ns) * 100, 2)
+            used_ram_mb = int(state_after.memory['usage'] / (1024*1024)) if state_after.memory and 'usage' in state_after.memory else 0
+            used_disk_mb = int(state_after.disk['root']['usage'] / (1024*1024)) if state_after.disk and 'root' in state_after.disk and 'usage' in state_after.disk['root'] else 0
+            bytes_rx_before, bytes_tx_before = 0, 0
+            if state_before.network:
+                for nic_data in state_before.network.values():
+                    if 'counters' in nic_data:
+                        bytes_rx_before += nic_data['counters'].get('bytes_received', 0)
+                        bytes_tx_before += nic_data['counters'].get('bytes_sent', 0)
+            bytes_rx_after, bytes_tx_after, bytes_total = 0, 0, 0
+            if state_after.network:
+                for nic_data in state_after.network.values():
+                    if 'counters' in nic_data:
+                        rx = nic_data['counters'].get('bytes_received', 0)
+                        tx = nic_data['counters'].get('bytes_sent', 0)
+                        bytes_rx_after += rx
+                        bytes_tx_after += tx
+                        bytes_total += rx + tx
+            rx_speed_bps = bytes_rx_after - bytes_rx_before
+            tx_speed_bps = bytes_tx_after - bytes_tx_before
+            used_flow_gb = round(bytes_total / (1024*1024*1024), 2)
+            stats = {
+                'cpu_usage_percent': max(0, cpu_percent),
+                'memory_usage_mb': used_ram_mb,
+                'disk_usage_mb': used_disk_mb,
+                'network_rx_kbps': round(rx_speed_bps / 1024, 2),
+                'network_tx_kbps': round(tx_speed_bps / 1024, 2),
+                'total_flow_used_gb': used_flow_gb,
+            }
+            return {'code': 200, 'msg': '获取成功', 'data': stats}
+        except LXDAPIException as e:
+            logger.error(f"LXD API错误 (get_container_realtime_stats) for {hostname}: {e}")
+            return {'code': 500, 'msg': f'LXD API错误: {e}'}
+        except Exception as e:
+            logger.error(f"获取实时状态时发生内部错误 for {hostname}: {str(e)}", exc_info=True)
+            return {'code': 500, 'msg': f'获取实时状态时发生内部错误: {str(e)}'}
+
+    # === Restored functions from 'server old' for API compatibility ===
 
     def create_container(self, params):
         hostname = params.get('hostname')
@@ -282,6 +367,81 @@ class LXCManager:
                      logger.error(f"尝试清理部分创建的容器 {container_to_cleanup_on_error.name} 时失败: {e_cleanup}")
             return {'code': 500, 'msg': f'{error_type_msg} (create): {str(e)}'}
 
+    def add_nat_rule_via_iptables(self, hostname, dtype, dport, sport):
+        container = self._get_container_or_error(hostname)
+        if not container: return {'code': 404, 'msg': '容器未找到'}
+
+        logger.info(f"为容器 {hostname} 通过iptables添加NAT规则: {dtype} {dport} -> {sport}")
+
+        limit = int(self._get_user_metadata(container, 'nat_acl_limit', 0))
+        rules_metadata = _load_iptables_rules_metadata()
+        current_host_rules_count = sum(1 for r in rules_metadata if r.get('hostname') == hostname)
+
+        is_ssh_rule = (str(sport) == '22' and dtype.lower() == 'tcp')
+        if not is_ssh_rule and limit > 0 and current_host_rules_count >= limit :
+            logger.warning(f"容器 {hostname} 已达到iptables NAT规则数量上限 ({limit}条)")
+            return {'code': 403, 'msg': f'已达到NAT规则数量上限 ({limit}条)'}
+        elif is_ssh_rule and limit > 0 and current_host_rules_count >= limit:
+            logger.info(f"允许为容器 {hostname} 添加SSH (端口22) 的NAT规则，即使已达到或超过常规端口转发上限 ({current_host_rules_count}/{limit})。")
+
+        for rule_meta in rules_metadata:
+            if rule_meta.get('hostname') == hostname and \
+               rule_meta.get('dtype', '').lower() == dtype.lower() and \
+               str(rule_meta.get('dport')) == str(dport):
+                logger.warning(f"容器 {hostname} 的iptables NAT规则 ({dtype} {dport}) 已存在")
+                return {'code': 409, 'msg': '此外部端口和协议的NAT规则已存在'}
+
+        container_ip = self._get_container_ip(container)
+        if not container_ip:
+            logger.error(f"为容器 {hostname} 添加iptables NAT规则失败: 无法获取内部IP")
+            return {'code': 500, 'msg': '无法获取容器内部IP地址'}
+
+        host_listen_ip = app_config.nat_listen_ip
+        main_interface = getattr(app_config, 'main_interface', None)
+        if not main_interface and not getattr(app_config, 'skip_masquerade', False):
+             logger.error("配置文件中缺少 main_interface (主网卡名) for iptables MASQUERADE rule, 或设置 skip_masquerade: true")
+             return {'code': 500, 'msg': '服务器配置错误：缺少主网卡信息用于NAT'}
+
+
+        rule_comment = f'lxd_controller_nat_{hostname}_{dtype.lower()}_{dport}'
+
+        dnat_args = [
+            '-t', 'nat', '-A', 'PREROUTING',
+            '-d', host_listen_ip,
+            '-p', dtype.lower(), '--dport', str(dport),
+            '-j', 'DNAT', '--to-destination', f"{container_ip}:{sport}",
+            '-m', 'comment', '--comment', rule_comment
+        ]
+        success_dnat, msg_dnat = self._run_shell_command_for_iptables(dnat_args)
+        if not success_dnat:
+            return {'code': 500, 'msg': f"添加DNAT规则失败: {msg_dnat}"}
+
+        if main_interface and not getattr(app_config, 'skip_masquerade', False):
+            masquerade_args = [
+                '-t', 'nat', '-A', 'POSTROUTING',
+                '-s', container_ip,
+                '-o', main_interface,
+                '-j', 'MASQUERADE',
+                '-m', 'comment', '--comment', f'{rule_comment}_masq'
+            ]
+            success_masq, msg_masq = self._run_shell_command_for_iptables(masquerade_args)
+            if not success_masq:
+                dnat_del_args = ['-t', 'nat', '-D', 'PREROUTING', '-d', host_listen_ip, '-p', dtype.lower(), '--dport', str(dport), '-j', 'DNAT', '--to-destination', f"{container_ip}:{sport}", '-m', 'comment', '--comment', rule_comment]
+                self._run_shell_command_for_iptables(dnat_del_args)
+                logger.error(f"添加MASQUERADE规则失败后，尝试回滚DNAT规则 for {rule_comment}")
+                return {'code': 500, 'msg': f"添加MASQUERADE规则失败: {msg_masq}"}
+
+        new_rule_meta = {
+            'hostname': hostname, 'dtype': dtype.lower(), 'dport': str(dport),
+            'sport': str(sport), 'container_ip': container_ip, 'rule_id': rule_comment
+        }
+        rules_metadata.append(new_rule_meta)
+        _save_iptables_rules_metadata(rules_metadata)
+
+        logger.info(f"容器 {hostname} 通过iptables添加DNAT规则成功 (MASQUERADE规则根据配置添加)")
+        return {'code': 200, 'msg': 'NAT规则(iptables)添加成功'}
+
+    # === End of restored functions ===
 
     def delete_container(self, hostname):
         container = self._get_container_or_error(hostname)
@@ -531,80 +691,6 @@ class LXCManager:
                 })
         logger.info(f"容器 {hostname} iptables NAT规则列表: {container_rules}")
         return {'code': 200, 'msg': '获取成功', 'data': container_rules}
-
-    def add_nat_rule_via_iptables(self, hostname, dtype, dport, sport):
-        container = self._get_container_or_error(hostname)
-        if not container: return {'code': 404, 'msg': '容器未找到'}
-
-        logger.info(f"为容器 {hostname} 通过iptables添加NAT规则: {dtype} {dport} -> {sport}")
-
-        limit = int(self._get_user_metadata(container, 'nat_acl_limit', 0))
-        rules_metadata = _load_iptables_rules_metadata()
-        current_host_rules_count = sum(1 for r in rules_metadata if r.get('hostname') == hostname)
-
-        is_ssh_rule = (str(sport) == '22' and dtype.lower() == 'tcp')
-        if not is_ssh_rule and limit > 0 and current_host_rules_count >= limit :
-            logger.warning(f"容器 {hostname} 已达到iptables NAT规则数量上限 ({limit}条)")
-            return {'code': 403, 'msg': f'已达到NAT规则数量上限 ({limit}条)'}
-        elif is_ssh_rule and limit > 0 and current_host_rules_count >= limit:
-            logger.info(f"允许为容器 {hostname} 添加SSH (端口22) 的NAT规则，即使已达到或超过常规端口转发上限 ({current_host_rules_count}/{limit})。")
-
-        for rule_meta in rules_metadata:
-            if rule_meta.get('hostname') == hostname and \
-               rule_meta.get('dtype', '').lower() == dtype.lower() and \
-               str(rule_meta.get('dport')) == str(dport):
-                logger.warning(f"容器 {hostname} 的iptables NAT规则 ({dtype} {dport}) 已存在")
-                return {'code': 409, 'msg': '此外部端口和协议的NAT规则已存在'}
-
-        container_ip = self._get_container_ip(container)
-        if not container_ip:
-            logger.error(f"为容器 {hostname} 添加iptables NAT规则失败: 无法获取内部IP")
-            return {'code': 500, 'msg': '无法获取容器内部IP地址'}
-
-        host_listen_ip = app_config.nat_listen_ip
-        main_interface = getattr(app_config, 'main_interface', None)
-        if not main_interface and not getattr(app_config, 'skip_masquerade', False):
-             logger.error("配置文件中缺少 main_interface (主网卡名) for iptables MASQUERADE rule, 或设置 skip_masquerade: true")
-             return {'code': 500, 'msg': '服务器配置错误：缺少主网卡信息用于NAT'}
-
-
-        rule_comment = f'lxd_controller_nat_{hostname}_{dtype.lower()}_{dport}'
-
-        dnat_args = [
-            '-t', 'nat', '-A', 'PREROUTING',
-            '-d', host_listen_ip,
-            '-p', dtype.lower(), '--dport', str(dport),
-            '-j', 'DNAT', '--to-destination', f"{container_ip}:{sport}",
-            '-m', 'comment', '--comment', rule_comment
-        ]
-        success_dnat, msg_dnat = self._run_shell_command_for_iptables(dnat_args)
-        if not success_dnat:
-            return {'code': 500, 'msg': f"添加DNAT规则失败: {msg_dnat}"}
-
-        if main_interface and not getattr(app_config, 'skip_masquerade', False):
-            masquerade_args = [
-                '-t', 'nat', '-A', 'POSTROUTING',
-                '-s', container_ip,
-                '-o', main_interface,
-                '-j', 'MASQUERADE',
-                '-m', 'comment', '--comment', f'{rule_comment}_masq'
-            ]
-            success_masq, msg_masq = self._run_shell_command_for_iptables(masquerade_args)
-            if not success_masq:
-                dnat_del_args = ['-t', 'nat', '-D', 'PREROUTING', '-d', host_listen_ip, '-p', dtype.lower(), '--dport', str(dport), '-j', 'DNAT', '--to-destination', f"{container_ip}:{sport}", '-m', 'comment', '--comment', rule_comment]
-                self._run_shell_command_for_iptables(dnat_del_args)
-                logger.error(f"添加MASQUERADE规则失败后，尝试回滚DNAT规则 for {rule_comment}")
-                return {'code': 500, 'msg': f"添加MASQUERADE规则失败: {msg_masq}"}
-
-        new_rule_meta = {
-            'hostname': hostname, 'dtype': dtype.lower(), 'dport': str(dport),
-            'sport': str(sport), 'container_ip': container_ip, 'rule_id': rule_comment
-        }
-        rules_metadata.append(new_rule_meta)
-        _save_iptables_rules_metadata(rules_metadata)
-
-        logger.info(f"容器 {hostname} 通过iptables添加DNAT规则成功 (MASQUERADE规则根据配置添加)")
-        return {'code': 200, 'msg': 'NAT规则(iptables)添加成功'}
 
     def delete_nat_rule_via_iptables(self, hostname, dtype, dport, sport, container_ip_at_creation_time=None):
         logger.info(f"为容器 {hostname} 通过iptables删除NAT规则: {dtype} {dport} -> {sport} (原始IP: {container_ip_at_creation_time})")
