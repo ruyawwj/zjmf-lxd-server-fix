@@ -15,6 +15,55 @@ function generateCaptcha() {
 }
 
 document.addEventListener('DOMContentLoaded', function() {
+    // Search functionality
+    const searchInput = document.getElementById('searchInput');
+    if (searchInput) {
+        searchInput.addEventListener('keyup', function(e) {
+            const searchTerm = e.target.value.toLowerCase();
+            const desktopRows = document.querySelectorAll('#containerListDesktopItems .custom-container-list-row');
+            desktopRows.forEach(row => {
+                const containerName = row.dataset.containerName.toLowerCase();
+                if (containerName.includes(searchTerm)) {
+                    row.style.display = 'flex';
+                } else {
+                    row.style.display = 'none';
+                }
+            });
+            const mobileCards = document.querySelectorAll('.container-list-mobile .card');
+            mobileCards.forEach(card => {
+                const containerName = card.dataset.containerName.toLowerCase();
+                if (containerName.includes(searchTerm)) {
+                    card.style.display = 'block';
+                } else {
+                    card.style.display = 'none';
+                }
+            });
+        });
+    }
+
+    // Sorting functionality
+    const headers = document.querySelectorAll('.custom-container-list-header .sortable');
+    headers.forEach(header => {
+        header.addEventListener('click', function() {
+            const sortColumn = this.dataset.sort;
+            const currentOrder = this.dataset.order || 'desc';
+            const newOrder = currentOrder === 'desc' ? 'asc' : 'desc';
+            this.dataset.order = newOrder;
+
+            // Reset other headers
+            headers.forEach(h => {
+                h.classList.remove('sorted');
+                h.querySelector('.sort-icon').classList.remove('asc', 'desc');
+            });
+
+            this.classList.add('sorted');
+            this.querySelector('.sort-icon').classList.add(newOrder);
+
+            sortTable(sortColumn, newOrder);
+        });
+    });
+
+
     if (document.getElementById('loginForm')) {
         generateCaptcha();
         const refreshButton = document.getElementById('refreshCaptchaBtn');
@@ -84,6 +133,37 @@ document.addEventListener('DOMContentLoaded', function() {
     }
 });
 
+function sortTable(column, order) {
+    const list = document.getElementById('containerListDesktopItems');
+    const rows = Array.from(list.querySelectorAll('.custom-container-list-row'));
+
+    const getSortValue = (row, col) => {
+        const cell = row.querySelector(`.col-${col} strong`) || row.querySelector(`.col-${col}`);
+        let textValue = 'N/A';
+        if (cell) {
+             textValue = (cell.tagName === 'STRONG' ? cell.innerText : cell.textContent).trim();
+        }
+        if (textValue === 'N/A' || textValue === '-') {
+            return -1; // Treat N/A as a very low value to group them
+        }
+        const numericValue = parseFloat(textValue);
+        return isNaN(numericValue) ? -1 : numericValue;
+    };
+
+    rows.sort((a, b) => {
+        const valA = getSortValue(a, column);
+        const valB = getSortValue(b, column);
+
+        if (order === 'asc') {
+            return valA - valB;
+        } else {
+            return valB - valA;
+        }
+    });
+
+    // Re-append sorted rows
+    rows.forEach(row => list.appendChild(row));
+}
 
 function showToast(message, type = 'info') {
     let toastType = 'info';
@@ -218,7 +298,7 @@ $('#confirmActionButton').click(function() {
             success: function(data) {
                 showToast(data.message, data.status);
                 if (data.status === 'success' || data.status === 'warning') {
-                    const containerNameInModalLabel = $('#infoModalLabel').text().replace('容器信息: ', '');
+                    const containerNameInModalLabel = $('#natRuleModalLabel').text().replace('NAT 规则: ', '');
                     if (containerNameInModalLabel) {
                         loadNatRules(containerNameInModalLabel);
                     } else {
@@ -287,18 +367,12 @@ function performAction(containerName, action, buttonElement) {
 
 function showInfo(containerName, buttonElement) {
     const basicInfoContent = $('#basicInfoContent');
-    const natRulesListContainer = $('#natRulesList');
-    const natRulesContent = $('#natRulesContent');
-    const natRulesError = $('#natRulesError');
     const infoError = $('#infoError');
     const infoModal = new bootstrap.Modal(document.getElementById('infoModal'));
 
     $('#infoModalLabel').text(`容器信息: ${containerName}`);
     basicInfoContent.html('正在加载基础信息...');
-    natRulesContent.html('<li>正在加载 NAT 规则...</li>');
-    natRulesError.addClass('d-none').text('');
     infoError.addClass('d-none').text('');
-    natRulesListContainer.show();
 
     setButtonProcessing(buttonElement, true);
     
@@ -310,7 +384,6 @@ function showInfo(containerName, buttonElement) {
                  basicInfoContent.html(`<strong>错误:</strong> ${data.message}`);
                  infoError.removeClass('d-none').text(data.message);
                  showToast("加载容器信息失败。", 'danger');
-                 natRulesListContainer.hide();
                  return;
              }
 
@@ -323,8 +396,6 @@ function showInfo(containerName, buttonElement) {
                 <p><strong>创建时间:</strong> ${data.created_at ? data.created_at.split('T')[0] : 'N/A'}</p>
             `;
             basicInfoContent.html(infoHtml);
-            
-            loadNatRules(containerName);
         },
         error: function(jqXHR) {
              if (jqXHR.status === 401) {
@@ -334,8 +405,6 @@ function showInfo(containerName, buttonElement) {
                 const message = jqXHR.responseJSON ? jqXHR.responseJSON.message : "请求失败，无法加载详细信息。";
                 basicInfoContent.html(`<strong>错误:</strong> ${message}`);
                 infoError.removeClass('d-none').text(message);
-                natRulesContent.html('<li>无法加载 NAT 规则。</li>');
-                natRulesListContainer.hide();
                 showToast("加载容器信息失败。", 'danger');
              }
         },
@@ -348,7 +417,7 @@ function showInfo(containerName, buttonElement) {
 
 function loadNatRules(containerName) {
     const natRulesContent = $('#natRulesContent');
-     const natRulesError = $('#natRulesError');
+    const natRulesError = $('#natRulesError');
     natRulesContent.html('<li>正在加载 NAT 规则...</li>');
     natRulesError.addClass('d-none').text('');
      $.ajax({
@@ -395,6 +464,24 @@ function loadNatRules(containerName) {
 
 function deleteNatRule(ruleId, buttonElement) {
     showConfirmationModal('delete_nat_rule', ruleId, buttonElement);
+}
+
+function showNatRuleModal(containerName, buttonElement) {
+    const natModal = new bootstrap.Modal(document.getElementById('natRuleModal'));
+    $('#natRuleModalLabel').text(`NAT 规则: ${containerName}`);
+    setButtonProcessing(buttonElement, true);
+    
+    loadNatRules(containerName);
+    
+    natModal.show();
+
+    const natModalEl = document.getElementById('natRuleModal');
+    natModalEl.addEventListener('shown.bs.modal', () => {
+        setButtonProcessing(buttonElement, false);
+    }, { once: true });
+     natModalEl.addEventListener('hidden.bs.modal', () => {
+        $('#natRulesContent').html('<li>...</li>');
+    }, { once: true });
 }
 
 let term;
@@ -495,8 +582,6 @@ $('#sshModal').on('hidden.bs.modal', function () {
 
 $('#infoModal').on('hidden.bs.modal', function () {
     $('#basicInfoContent').html('正在加载基础信息...');
-    $('#natRulesContent').html('<li>正在加载 NAT 规则...</li>');
-    $('#natRulesError').addClass('d-none').text('');
     $('#infoError').addClass('d-none').text('');
     $('#infoModalLabel').text('容器信息');
 });

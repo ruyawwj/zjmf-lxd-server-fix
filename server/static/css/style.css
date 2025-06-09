@@ -126,6 +126,37 @@ body { }
     padding: 0.5rem 0;
 }
 
+.custom-container-list-header .sortable {
+    cursor: pointer;
+    user-select: none;
+}
+.custom-container-list-header .sortable:hover {
+    background-color: #e9ecef;
+}
+.sort-icon::after {
+    font-size: 0.8em;
+    margin-left: 5px;
+    color: #999;
+    content: '↕';
+    display: inline-block;
+    width: 1em;
+}
+.sort-icon.asc::after {
+    content: '↑';
+    color: #333;
+}
+.sort-icon.desc::after {
+    content: '↓';
+    color: #333;
+}
+
+/* Smaller font for desktop list to fit all columns */
+.custom-container-list-header,
+.custom-container-list-row {
+    font-size: 13px;
+    white-space: nowrap;
+}
+
 .custom-col {
     padding: 0 0.75rem;
     box-sizing: border-box;
