@@ -2,7 +2,7 @@
 
 set -e
 
-IMAGE_URL="https://lsez.site/f/3OCL/debian12-arm64-ssh.tar.gz"
+IMAGE_URL="https://lsez.site/f/6bhb/debian12-arm64-ssh.tar.gz"
 IMAGE_FILE="debian12-arm64-ssh.tar.gz"
 ALIAS_NAME="debian12-arm64-ssh"
 
