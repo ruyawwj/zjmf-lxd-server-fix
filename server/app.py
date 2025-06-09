@@ -3,6 +3,7 @@ from flask import Flask, render_template, jsonify, request, session, redirect, u
 from functools import wraps
 import logging
 import datetime
+from math import ceil
 
 from config_handler import app_config
 from lxc_manager import LXCManager, _load_iptables_rules_metadata
@@ -60,7 +61,8 @@ def login():
         'containers': [],
         'images': [],
         'available_pools': [],
-        'login_error': None
+        'login_error': None,
+        'pagination': {}
     }
 
     if request.method == 'POST':
@@ -130,6 +132,19 @@ def index():
         logger.error(f"获取容器列表失败: {e}", exc_info=True)
         incus_error = (True, str(e))
 
+    page = request.args.get('page', 1, type=int)
+    allowed_per_page = [20, 50, 100]
+    per_page = request.args.get('per_page', 20, type=int)
+    if per_page not in allowed_per_page:
+        per_page = 20
+
+    total_items = len(containers_list)
+    total_pages = ceil(total_items / per_page)
+    start = (page - 1) * per_page
+    end = start + per_page
+    paginated_containers = sorted(containers_list, key=lambda x: x['name'])[start:end]
+
+
     image_error = (False, None)
     available_images = []
     try:
@@ -152,13 +167,22 @@ def index():
         logger.error(f"获取存储池列表失败: {e}")
         storage_error = (True, str(e))
 
+    pagination_details = {
+        'page': page,
+        'per_page': per_page,
+        'total_pages': total_pages,
+        'total_items': total_items,
+        'allowed_per_page': allowed_per_page
+    }
+
     return render_template('index.html',
-                           containers=containers_list,
+                           containers=paginated_containers,
                            images=available_images,
                            available_pools=available_pools,
                            incus_error=incus_error,
                            image_error=image_error,
                            storage_error=storage_error,
+                           pagination=pagination_details,
                            session=session)
 
 @app.route('/container/<name>/action', methods=['POST'])
@@ -200,7 +224,7 @@ def container_info(name):
         'config': raw_data.get('config', {}),
         'devices': raw_data.get('devices', {}),
         'state': raw_data.get('state', {}),
-        'image_source': lxc_data.get('ImageSourceAlias'), # <-- MODIFIED THIS LINE
+        'image_source': lxc_data.get('ImageSourceAlias'),
         'description': raw_data.get('description'),
         'ip': lxc_data.get('IP'),
         'total_ram_mb': lxc_data.get('TotalRam', 0),

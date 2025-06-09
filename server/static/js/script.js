@@ -15,6 +15,18 @@ function generateCaptcha() {
 }
 
 document.addEventListener('DOMContentLoaded', function() {
+    // Per-page selector for pagination
+    const perPageSelect = document.getElementById('perPageSelect');
+    if (perPageSelect) {
+        perPageSelect.addEventListener('change', function() {
+            const perPage = this.value;
+            const url = new URL(window.location.href);
+            url.searchParams.set('per_page', perPage);
+            url.searchParams.set('page', '1'); // Reset to page 1 when changing items per page
+            window.location.href = url.toString();
+        });
+    }
+
     // Search functionality
     const searchInput = document.getElementById('searchInput');
     if (searchInput) {
@@ -50,7 +62,6 @@ document.addEventListener('DOMContentLoaded', function() {
             const newOrder = currentOrder === 'desc' ? 'asc' : 'desc';
             this.dataset.order = newOrder;
 
-            // Reset other headers
             headers.forEach(h => {
                 h.classList.remove('sorted');
                 h.querySelector('.sort-icon').classList.remove('asc', 'desc');
