@@ -180,7 +180,7 @@ function showToast(message, type = 'info') {
     let toastType = 'info';
     if (type === 'success') {
         toastType = 'success';
-    } else if (type === 'error') {
+    } else if (type === 'error' || type === 'danger') {
         toastType = 'danger';
     } else if (type === 'warning') {
         toastType = 'warning';
@@ -189,21 +189,23 @@ function showToast(message, type = 'info') {
     const toastHtml = `
         <div class="toast align-items-center text-bg-${toastType} border-0" role="alert" aria-live="assertive" aria-atomic="true">
             <div class="d-flex">
-                <div class="toast-body">
-                    ${message}
-                </div>
+                <div class="toast-body"></div>
                 <button type="button" class="btn-close btn-close-white me-2 m-auto" data-bs-dismiss="toast" aria-label="Close"></button>
             </div>
         </div>
     `;
     const toastElement = $(toastHtml);
+    // Use .text() to safely insert the message
+    $('.toast-body', toastElement).text(message);
     toastContainer.append(toastElement);
+
     const toast = new bootstrap.Toast(toastElement[0]);
     toast.show();
     toastElement.on('hidden.bs.toast', function () {
         $(this).remove();
     });
 }
+
 
 function setButtonProcessing(button, isProcessing) {
     const $button = $(button);
@@ -244,43 +246,64 @@ function showConfirmationModal(actionType, nameOrId, buttonElement) {
     let buttonClass = 'btn-primary';
     let buttonText = '确认';
 
+    // Clear previous content and set a safe base structure
+    modalBody.empty();
+    
     if (actionType === 'start_container') {
         currentConfirmContainerName = nameOrId;
         currentConfirmRuleId = null;
         modalTitle.text('确认启动');
-        message = `确定要启动容器 <strong>${nameOrId}</strong> 吗？`;
+        message = '确定要启动容器 ';
         buttonClass = 'btn-success';
         buttonText = '启动';
+        modalBody.append(document.createTextNode(message))
+                 .append($('<strong>').text(nameOrId))
+                 .append(document.createTextNode(' 吗？'));
     } else if (actionType === 'stop_container') {
         currentConfirmContainerName = nameOrId;
         currentConfirmRuleId = null;
         modalTitle.text('确认停止');
-        message = `确定要停止容器 <strong>${nameOrId}</strong> 吗？`;
+        message = '确定要停止容器 ';
         buttonClass = 'btn-warning';
         buttonText = '停止';
+        modalBody.append(document.createTextNode(message))
+                 .append($('<strong>').text(nameOrId))
+                 .append(document.createTextNode(' 吗？'));
     } else if (actionType === 'restart_container') {
         currentConfirmContainerName = nameOrId;
         currentConfirmRuleId = null;
         modalTitle.text('确认重启');
-        message = `确定要重启容器 <strong>${nameOrId}</strong> 吗？`;
+        message = '确定要重启容器 ';
         buttonClass = 'btn-warning';
         buttonText = '重启';
+        modalBody.append(document.createTextNode(message))
+                 .append($('<strong>').text(nameOrId))
+                 .append(document.createTextNode(' 吗？'));
     } else if (actionType === 'delete_container') {
         currentConfirmContainerName = nameOrId;
-         currentConfirmRuleId = null;
+        currentConfirmRuleId = null;
         modalTitle.text('确认删除容器');
-        message = `<strong>警告：</strong> 这将永久删除容器 <strong>${nameOrId}</strong> 及其所有数据！<br>同时将强制删除所有通过本应用添加的关联 NAT 规则。<br>确定删除吗？`;
+        modalBody.append($('<strong>').text('警告：'))
+                 .append(document.createTextNode(' 这将永久删除容器 '))
+                 .append($('<strong>').text(nameOrId))
+                 .append(document.createTextNode(' 及其所有数据！'))
+                 .append($('<br>'))
+                 .append(document.createTextNode('同时将强制删除所有通过本应用添加的关联 NAT 规则。'))
+                 .append($('<br>'))
+                 .append(document.createTextNode('确定删除吗？'));
         buttonClass = 'btn-danger';
         buttonText = '删除容器';
-     } else if (actionType === 'delete_nat_rule') {
-         currentConfirmContainerName = null;
-         currentConfirmRuleId = nameOrId;
+    } else if (actionType === 'delete_nat_rule') {
+        currentConfirmContainerName = null;
+        currentConfirmRuleId = nameOrId;
         modalTitle.text('确认删除 NAT 规则');
-        message = `确定要删除 ID 为 <strong>${nameOrId}</strong> 的 NAT 规则吗？此操作将尝试移除对应的 iptables 规则记录 (仅针对通过本应用添加的规则)。`;
+        modalBody.append(document.createTextNode('确定要删除 ID 为 '))
+                 .append($('<strong>').text(nameOrId))
+                 .append(document.createTextNode(' 的 NAT 规则吗？此操作将尝试移除对应的 iptables 规则记录 (仅针对通过本应用添加的规则)。'));
         buttonClass = 'btn-danger';
         buttonText = '删除规则';
     }
-    modalBody.html(message);
+
     confirmButton.removeClass('btn-primary btn-warning btn-danger btn-success').addClass(buttonClass).text(buttonText);
     setButtonProcessing(confirmButton, false);
     const confirmModal = new bootstrap.Modal(document.getElementById('confirmModal'));
@@ -382,7 +405,7 @@ function showInfo(containerName, buttonElement) {
     const infoModal = new bootstrap.Modal(document.getElementById('infoModal'));
 
     $('#infoModalLabel').text(`容器信息: ${containerName}`);
-    basicInfoContent.html('正在加载基础信息...');
+    basicInfoContent.text('正在加载基础信息...'); // Use text for loading message
     infoError.addClass('d-none').text('');
 
     setButtonProcessing(buttonElement, true);
@@ -392,21 +415,42 @@ function showInfo(containerName, buttonElement) {
         type: "GET",
         success: function(data) {
              if (data.status === 'NotFound') {
-                 basicInfoContent.html(`<strong>错误:</strong> ${data.message}`);
+                 basicInfoContent.text(`错误: ${data.message}`); // Use text for error message
                  infoError.removeClass('d-none').text(data.message);
                  showToast("加载容器信息失败。", 'danger');
                  return;
              }
 
-            let infoHtml = `
-                <p><strong>名称:</strong> ${data.name}</p>
-                <p><strong>状态:</strong> <span class="badge bg-${data.status === 'Running' ? 'success' : data.status === 'Stopped' ? 'danger' : 'secondary'}">${data.status}</span></p>
-                <p><strong>IP 地址:</strong> ${data.ip && data.ip !== 'N/A' ? data.ip : '-'}</p>
-                <p><strong>镜像:</strong> ${data.description && data.description !== 'N/A' ? data.description : data.image_source && data.image_source !== 'N/A' ? data.image_source : 'N/A'}</p>
-                <p><strong>架构:</strong> ${data.architecture && data.architecture !== 'N/A' ? data.architecture : 'N/A'}</p>
-                <p><strong>创建时间:</strong> ${data.created_at ? data.created_at.split('T')[0] : 'N/A'}</p>
-            `;
-            basicInfoContent.html(infoHtml);
+            // Securely build the info content
+            basicInfoContent.empty(); // Clear loading message
+
+            const createInfoRow = (label, value) => {
+                const p = $('<p></p>');
+                p.append($('<strong></strong>').text(label + ': '));
+                p.append(document.createTextNode(value));
+                return p;
+            };
+            
+            const createStatusRow = (label, status) => {
+                 const p = $('<p></p>');
+                 const badge = $('<span></span>')
+                    .addClass('badge')
+                    .addClass(`bg-${status === 'Running' ? 'success' : status === 'Stopped' ? 'danger' : 'secondary'}`)
+                    .text(status);
+                 p.append($('<strong></strong>').text(label + ': '));
+                 p.append(badge);
+                 return p;
+            };
+
+            basicInfoContent.append(createInfoRow('名称', data.name || 'N/A'));
+            basicInfoContent.append(createStatusRow('状态', data.status || 'Unknown'));
+            basicInfoContent.append(createInfoRow('IP 地址', (data.ip && data.ip !== 'N/A') ? data.ip : '-'));
+            
+            const imageInfo = (data.description && data.description !== 'N/A') ? data.description : (data.image_source && data.image_source !== 'N/A') ? data.image_source : 'N/A';
+            basicInfoContent.append(createInfoRow('镜像', imageInfo));
+            basicInfoContent.append(createInfoRow('架构', (data.architecture && data.architecture !== 'N/A') ? data.architecture : 'N/A'));
+            basicInfoContent.append(createInfoRow('创建时间', data.created_at ? data.created_at.split('T')[0] : 'N/A'));
+
         },
         error: function(jqXHR) {
              if (jqXHR.status === 401) {
@@ -414,7 +458,7 @@ function showInfo(containerName, buttonElement) {
                 setTimeout(() => window.location.href = "/login?next=" + window.location.pathname, 1000);
              } else {
                 const message = jqXHR.responseJSON ? jqXHR.responseJSON.message : "请求失败，无法加载详细信息。";
-                basicInfoContent.html(`<strong>错误:</strong> ${message}`);
+                basicInfoContent.text(`错误: ${message}`); // Use text for error message
                 infoError.removeClass('d-none').text(message);
                 showToast("加载容器信息失败。", 'danger');
              }
@@ -438,18 +482,23 @@ function loadNatRules(containerName) {
             natRulesContent.empty();
             if (data.status === 'success' && data.rules && data.rules.length > 0) {
                 data.rules.forEach(rule => {
-                    const ruleHtml = `
-                        <li data-rule-id="${rule.id}">
-                            <span class="rule-details">
-                                <strong>ID ${rule.id}:</strong> 主机 ${rule.host_port}/${rule.protocol} → 容器 ${rule.ip_at_creation}:${rule.container_port}
-                                <br><small class="text-muted">记录创建时间: ${rule.created_at ? new Date(rule.created_at).toLocaleString() : 'N/A'}</small>
-                            </span>
-                            <span class="rule-actions">
-                                 <button class="btn btn-sm btn-danger" onclick="deleteNatRule('${rule.id}', this)">删除</button>
-                            </span>
-                        </li>
-                    `;
-                    natRulesContent.append(ruleHtml);
+                    // Build rule elements securely
+                    const detailsSpan = $('<span></span>').addClass('rule-details');
+                    detailsSpan.append($('<strong></strong>').text(`ID ${rule.id}:`));
+                    detailsSpan.append(document.createTextNode(` 主机 ${rule.host_port}/${rule.protocol} → 容器 ${rule.ip_at_creation}:${rule.container_port}`));
+                    detailsSpan.append($('<br>'));
+                    detailsSpan.append($('<small></small>').addClass('text-muted').text(`记录创建时间: ${rule.created_at ? new Date(rule.created_at).toLocaleString() : 'N/A'}`));
+
+                    const deleteButton = $('<button></button>')
+                        .addClass('btn btn-sm btn-danger')
+                        .text('删除')
+                        .on('click', function() { deleteNatRule(rule.id, this); });
+
+                    const actionsSpan = $('<span></span>').addClass('rule-actions').append(deleteButton);
+                    
+                    const li = $('<li></li>').attr('data-rule-id', rule.id).append(detailsSpan).append(actionsSpan);
+
+                    natRulesContent.append(li);
                 });
             } else if (data.status === 'success' && data.rules && data.rules.length === 0) {
                 natRulesContent.html('<li>没有通过本应用添加的 NAT 规则记录。</li>');
