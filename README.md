@@ -1,3 +1,5 @@
+# 此插件将重新使用Incus进行开发,尽情期待
+
 # 魔方财务-LXD 对接插件 (zjmf-lxd-server)
 
 这是一个为 [魔方财务](https://www.google.com/search?q=https://www.zjmf.com/) (ZJMF) 系统开发的 LXD 对接插件，旨在为主机商提供一套完整、自动化的 LXD 容器销售与管理解决方案。
