@@ -58,6 +58,6 @@ RESET="\e[0m"
 
 # 显示配置
 echo -e "========== app.ini 配置 =========="
-echo -e "管理后台地址: ${GREEN}http://$external_ip:$port${RESET}"
+echo -e "管理后台:     ${GREEN}http://$external_ip:$port${RESET}"
 echo -e "登录密码:     ${YELLOW}$api_token${RESET}"
 echo -e "=================================="
