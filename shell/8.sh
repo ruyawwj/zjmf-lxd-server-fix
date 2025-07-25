@@ -9,8 +9,8 @@ if [[ ! -f "$INI_FILE" ]]; then
 fi
 
 # 读取配置
-port=$(grep -E '^port[[:space:]]*=' "$INI_FILE" | cut -d '=' -f2 | tr -d '[:space:]')
-api_token=$(grep -E '^api_token[[:space:]]*=' "$INI_FILE" | cut -d '=' -f2 | tr -d '[:space:]')
+port=$(awk -F= '/^HTTP_PORT[[:space:]]*=/ {gsub(/[[:space:]]/, "", $2); print $2}' "$INI_FILE")
+api_token=$(awk -F= '/^TOKEN[[:space:]]*=/ {gsub(/[[:space:]]/, "", $2); print $2}' "$INI_FILE")
 
 # 国内优先的外网 IP 接口列表
 ip_services=(
