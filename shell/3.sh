@@ -110,10 +110,10 @@ apt install -y python3-pip python3-flask
 # --- 创建/更新 systemd 服务 ---
 SERVICE_FILE=/etc/systemd/system/lxd-api.service
 
-if systemctl is-active --quiet lxd-api.service || systemctl is-enabled --quiet lxd-api.service; then
+if [ -f "$SERVICE_FILE" ]; then
     echo "[INFO] 发现已存在的 lxd-api.service，正在停止并删除旧服务..."
-    systemctl stop lxd-api.service
-    systemctl disable lxd-api.service
+    systemctl stop lxd-api.service || true
+    systemctl disable lxd-api.service || true
     rm -f "$SERVICE_FILE"
     systemctl daemon-reload
     echo "[INFO] 旧服务已删除."
