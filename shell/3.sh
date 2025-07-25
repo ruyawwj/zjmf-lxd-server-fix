@@ -85,7 +85,7 @@ while true; do
 done
 
 # --- 写入 app.ini 配置 ---
-cat > app.ini <<EOF
+cat > /root/zjmf-lxd-server-fix/server/app.ini <<EOF
 [server]
 HTTP_PORT = $HTTP_PORT
 TOKEN = $TOKEN
