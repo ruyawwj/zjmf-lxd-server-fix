@@ -13,8 +13,8 @@ set -o pipefail
 declare -A SCRIPTS
 SCRIPTS=(
     ["1"]="部署运行脚本环境;https://raw.githubusercontent.com/StarVM-OpenSource/zjmf-lxd-server-fix/refs/heads/main/shell/1.sh"
-    ["2"]="部署LXD环境并创建存储池;https://raw.githubusercontent.com/StarVM-OpenSource/zjmf-lxd-server-fix/refs/heads/main/shell/2.sh"
-    ["3"]="linuxmirrors综合脚本;https://git.fsytool.top/xkatld/linuxtools/raw/branch/main/shell/linuxmirrors.sh"
+    ["2"]="部署LXC环境并创建存储池;https://raw.githubusercontent.com/StarVM-OpenSource/zjmf-lxd-server-fix/refs/heads/main/shell/2.sh"
+    ["3"]="安装被控;https://git.fsytool.top/xkatld/linuxtools/raw/branch/main/shell/linuxmirrors.sh"
     ["4"]="SSH综合管理;https://git.fsytool.top/xkatld/linuxtools/raw/branch/main/shell/ssh-manager.sh"
     ["5"]="系统优化综合脚本;https://git.fsytool.top/xkatld/linuxtools/raw/branch/main/shell/SysOptimize.sh"
     ["6"]="PVE安装与镜像管理;https://git.fsytool.top/xkatld/linuxtools/raw/branch/main/shell/install-pve.sh"
