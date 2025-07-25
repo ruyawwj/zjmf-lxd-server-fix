@@ -1,56 +1,76 @@
 #!/bin/bash
+set -e
 
-# 检测当前是否存在 /swapfile 且正在使用
-if swapon --show | grep -q '^/swapfile'; then
-    echo "[INFO] 检测到系统已启用 /swapfile"
-    read -rp "[?] 是否关闭当前的 /swapfile? [Y/N]: " confirm_close
-    if [[ "$confirm_close" =~ ^[Yy]$ ]]; then
-        echo "[INFO] 正在关闭 /swapfile..."
+echo "[INFO] 检测系统中是否启用 /swapfile ..."
+
+# 检查 /swapfile 是否被启用为swap
+SWAPFILE_ACTIVE=$(swapon --noheadings --raw | awk '{print $1}' | grep '^/swapfile$' || true)
+
+if [[ -n "$SWAPFILE_ACTIVE" ]]; then
+    echo "[WARN] /swapfile 目前作为 swap 使用中。"
+    read -rp "是否关闭 /swapfile 的 swap？[y/N]: " disable_swapfile
+    if [[ "$disable_swapfile" =~ ^[Yy]$ ]]; then
+        echo "[INFO] 正在关闭 /swapfile ..."
         swapoff /swapfile
-        sed -i '/\/swapfile/d' /etc/fstab
-        rm -f /swapfile
-        echo "[INFO] /swapfile 已关闭"
-
-        read -rp "[?] 是否需要创建新的 swap 文件? [Y/N]: " confirm_new
-        if [[ "$confirm_new" =~ ^[Nn]$ ]]; then
-            echo "[INFO] 已取消新建 swap，退出脚本。"
-            exit 0
-        fi
+        echo "[INFO] /swapfile swap 已关闭。退出脚本。"
+        exit 0
     else
-        echo "[INFO] 已保留当前 /swapfile，退出脚本。"
+        echo "[INFO] 保持 /swapfile swap 状态，不做修改，退出脚本。"
         exit 0
     fi
+else
+    echo "[INFO] /swapfile 当前未启用为 swap，进入创建流程。"
 fi
 
-# 开始创建新的 swap
-read -rp "[?] 请输入 swap 大小（纯数字）: " swap_size
-read -rp "[?] 请输入单位（MB 或 GB）: " unit
+# 选择单位
+while true; do
+    read -rp "请选择单位 GB 或 MB (输入 G 或 M): " UNIT
+    UNIT=${UNIT^^}  # 转成大写
+    if [[ "$UNIT" == "G" || "$UNIT" == "M" ]]; then
+        break
+    else
+        echo "[ERROR] 请输入有效单位 G 或 M"
+    fi
+done
 
-# 转换为实际大小
-case "$unit" in
-    MB|mb)
-        count=$swap_size
-        ;;
-    GB|gb)
-        count=$((swap_size * 1024))
-        ;;
-    *)
-        echo "[错误] 单位无效，仅支持 MB 或 GB"
-        exit 1
-        ;;
-esac
+# 输入大小
+while true; do
+    read -rp "请输入想创建的 Swap 大小 (单位: $UNIT): " SIZE
+    if [[ "$SIZE" =~ ^[1-9][0-9]*$ ]]; then
+        break
+    else
+        echo "[ERROR] 请输入正整数大小"
+    fi
+done
 
-echo "[INFO] 正在创建 ${swap_size}${unit} 的 swap 文件..."
+# 计算字节数
+if [[ "$UNIT" == "G" ]]; then
+    SWAP_SIZE_BYTES=$((SIZE * 1024 * 1024 * 1024))
+else
+    SWAP_SIZE_BYTES=$((SIZE * 1024 * 1024))
+fi
 
-# 创建 swap 文件
-dd if=/dev/zero of=/swapfile bs=1M count=$count status=progress
+echo "[INFO] 创建 ${SIZE}${UNIT} 大小的 swap 文件 /swapfile ..."
+fallocate -l $SWAP_SIZE_BYTES /swapfile
+
+echo "[INFO] 设置文件权限..."
 chmod 600 /swapfile
+
+echo "[INFO] 格式化 swap 文件..."
 mkswap /swapfile
+
+echo "[INFO] 启用 swap 文件..."
 swapon /swapfile
 
-# 添加到 /etc/fstab
-if ! grep -q '^/swapfile' /etc/fstab; then
-    echo '/swapfile none swap sw 0 0' >> /etc/fstab
+# 检查 fstab 是否已存在 swapfile 条目
+if grep -q '^/swapfile' /etc/fstab; then
+    echo "[INFO] /etc/fstab 已存在 swapfile 条目，跳过写入。"
+else
+    echo "[INFO] 写入 /etc/fstab 以实现开机自动启用 swap ..."
+    echo "/swapfile none swap sw 0 0" >> /etc/fstab
 fi
 
-echo "[INFO] swap 已创建并启用：$(free -h | grep Swap)"
+echo "[INFO] Swap 创建并启用成功。当前 swap 状态："
+swapon --show
+
+echo "[INFO] 脚本执行完毕。"
