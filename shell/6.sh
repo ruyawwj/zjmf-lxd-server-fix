@@ -1,4 +1,5 @@
 #!/bin/bash
+
 if [ "$(id -u)" -ne 0 ]; then
    echo "错误：此脚本必须以root用户身份运行。"
    echo "请尝试使用 'sudo bash' 命令来执行。"
@@ -170,50 +171,69 @@ while true; do
             ;;
     esac
 
-    case "$ARCH" in
-        arm64)
-            case "${OS}_${VERSION}" in
-                centos_9-stream) FILENAME="centos9-stream-arm64-ssh.tar.gz" ;;
-                debian_11)      FILENAME="debian11-arm64-ssh.tar.gz" ;;
-                debian_12)      FILENAME="debian12-arm64-ssh.tar.gz" ;;
-                debian_13)      FILENAME="debian13-arm64-ssh.tar.gz" ;;
-                ubuntu_20-04)   FILENAME="ubuntu20-04-arm64-ssh.tar.gz" ;;
-                ubuntu_22-04)   FILENAME="ubuntu22-04-arm64-ssh.tar.gz" ;;
-                ubuntu_24-10)   FILENAME="ubuntu24-10-arm64-ssh.tar.gz" ;;
-                ubuntu_25-04)   FILENAME="ubuntu25-04-arm64-ssh.tar.gz" ;;
-                almalinux_8)    FILENAME="almalinux8-arm64-ssh.tar.gz" ;;
-                almalinux_9)    FILENAME="almalinux9-arm64-ssh.tar.gz" ;;
-                fedora_40)     FILENAME="fedora40-arm64-ssh.tar.gz" ;;
-                fedora_41)     FILENAME="fedora41-arm64-ssh.tar.gz" ;;
-                fedora_42)     FILENAME="fedora42-arm64-ssh.tar.gz" ;;
-                opensuse_15-5) FILENAME="opensuse15-5-arm64-ssh.tar.gz" ;;
-                opensuse_15-6) FILENAME="opensuse15-6-arm64-ssh.tar.gz" ;;
-                opensuse_tumbleweed) FILENAME="opensusetumbleweed-arm64-ssh.tar.gz" ;;
-                rockylinux_8)  FILENAME="rockylinux8-arm64-ssh.tar.gz" ;;
-                rockylinux_9)  FILENAME="rockylinux9-arm64-ssh.tar.gz" ;;
-                *)
-                    echo "错误：不支持的 arm64 系统版本组合 ${OS}_${VERSION}"
-                    read -p "按回车返回主菜单..."
-                    continue
-                    ;;
-            esac
-            URL="https://github.com/StarVM-OpenSource/zjmf-lxd-server-fix/releases/download/arm64/${FILENAME}"
-            ;;
-        amd64)
-            echo "错误：amd64 架构的下载地址未配置，请补充后重试。"
-            read -p "按回车返回主菜单..."
-            continue
-            ;;
-        *)
-            echo "错误：未知架构。"
-            read -p "按回车返回主菜单..."
-            continue
-            ;;
-    esac
+    if [ "$ARCH" == "arm64" ]; then
+        case "${OS}_${VERSION}" in
+            centos_9-stream)      FILENAME="centos9-stream-arm64-ssh.tar.gz" ;;
+            debian_11)            FILENAME="debian11-arm64-ssh.tar.gz" ;;
+            debian_12)            FILENAME="debian12-arm64-ssh.tar.gz" ;;
+            debian_13)            FILENAME="debian13-arm64-ssh.tar.gz" ;;
+            ubuntu_20-04)         FILENAME="ubuntu20-04-arm64-ssh.tar.gz" ;;
+            ubuntu_22-04)         FILENAME="ubuntu22-04-arm64-ssh.tar.gz" ;;
+            ubuntu_24-10)         FILENAME="ubuntu24-10-arm64-ssh.tar.gz" ;;
+            ubuntu_25-04)         FILENAME="ubuntu25-04-arm64-ssh.tar.gz" ;;
+            almalinux_8)          FILENAME="almalinux8-arm64-ssh.tar.gz" ;;
+            almalinux_9)          FILENAME="almalinux9-arm64-ssh.tar.gz" ;;
+            fedora_40)            FILENAME="fedora40-arm64-ssh.tar.gz" ;;
+            fedora_41)            FILENAME="fedora41-arm64-ssh.tar.gz" ;;
+            fedora_42)            FILENAME="fedora42-arm64-ssh.tar.gz" ;;
+            opensuse_15-5)        FILENAME="opensuse15-5-arm64-ssh.tar.gz" ;;
+            opensuse_15-6)        FILENAME="opensuse15-6-arm64-ssh.tar.gz" ;;
+            opensuse_tumbleweed)  FILENAME="opensusetumbleweed-arm64-ssh.tar.gz" ;;
+            rockylinux_8)         FILENAME="rockylinux8-arm64-ssh.tar.gz" ;;
+            rockylinux_9)         FILENAME="rockylinux9-arm64-ssh.tar.gz" ;;
+            *)
+                echo "错误：不支持的 arm64 系统版本组合 ${OS}_${VERSION}"
+                read -p "按回车返回主菜单..."
+                continue
+                ;;
+        esac
+        URL="https://github.com/StarVM-OpenSource/zjmf-lxd-server-fix/releases/download/arm64/${FILENAME}"
+    elif [ "$ARCH" == "amd64" ]; then
+        case "${OS}_${VERSION}" in
+            centos_9-stream)      FILENAME="centos9-stream-amd64-ssh.tar.gz" ;;
+            debian_11)            FILENAME="debian11-amd64-ssh.tar.gz" ;;
+            debian_12)            FILENAME="debian12-amd64-ssh.tar.gz" ;;
+            debian_13)            FILENAME="debian13-amd64-ssh.tar.gz" ;;
+            ubuntu_20-04)         FILENAME="ubuntu20-04-amd64-ssh.tar.gz" ;;
+            ubuntu_22-04)         FILENAME="ubuntu22-04-amd64-ssh.tar.gz" ;;
+            ubuntu_24-10)         FILENAME="ubuntu24-10-amd64-ssh.tar.gz" ;;
+            ubuntu_25-04)         FILENAME="ubuntu25-04-amd64-ssh.tar.gz" ;;
+            almalinux_8)          FILENAME="almalinux8-amd64-ssh.tar.gz" ;;
+            almalinux_9)          FILENAME="almalinux9-amd64-ssh.tar.gz" ;;
+            fedora_40)            FILENAME="fedora40-amd64-ssh.tar.gz" ;;
+            fedora_41)            FILENAME="fedora41-amd64-ssh.tar.gz" ;;
+            fedora_42)            FILENAME="fedora42-amd64-ssh.tar.gz" ;;
+            opensuse_15-5)        FILENAME="opensuse15-5-amd64-ssh.tar.gz" ;;
+            opensuse_15-6)        FILENAME="opensuse15-6-amd64-ssh.tar.gz" ;;
+            opensuse_tumbleweed)  FILENAME="opensusetumbleweed-amd64-ssh.tar.gz" ;;
+            rockylinux_8)         FILENAME="rockylinux8-amd64-ssh.tar.gz" ;;
+            rockylinux_9)         FILENAME="rockylinux9-amd64-ssh.tar.gz" ;;
+            *)
+                echo "错误：不支持的 amd64 系统版本组合 ${OS}_${VERSION}"
+                read -p "按回车返回主菜单..."
+                continue
+                ;;
+        esac
+        URL="https://github.com/StarVM-OpenSource/zjmf-lxd-server-fix/releases/download/amd64/${FILENAME}"
+    else
+        echo "错误：未知架构。"
+        read -p "按回车返回主菜单..."
+        continue
+    fi
 
     echo
     echo "您已选择: ${OS} ${VERSION} - 架构 ${ARCH}"
-    echo "步骤 1/3: 开始下载文件..."
+    echo "步骤 1/2: 开始下载文件..."
     wget --progress=bar:force -O "${DEST_DIR}/${FILENAME}" "${URL}"
     if [ $? -ne 0 ]; then
         echo "错误：下载失败，请检查网络或链接有效性。"
@@ -223,14 +243,14 @@ while true; do
     echo "下载完成。"
     echo
 
-    echo "步骤 2/3: 导入 LXC 镜像..."
+    echo "步骤 2/2: 导入 LXC 镜像..."
     lxc image import "${DEST_DIR}/${FILENAME}" --alias "${OS}-${VERSION}-${ARCH}"
     if [ $? -ne 0 ]; then
         echo "错误：导入 LXC 镜像失败。"
         read -p "按回车返回主菜单..."
         continue
     fi
-    rm -f "${DEST_DIR}/${FILENAME}"
+    rm -f "${DEST_DIR:?}/${FILENAME}"
     echo "镜像导入成功。"
     echo
 
