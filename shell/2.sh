@@ -49,10 +49,15 @@ install_lxd() {
     msg "BLUE" "开始通过 snap 安装 LXD..."
     snap install core
     snap install lxd
+
+    # 添加 snap 路径
+    export PATH=$PATH:/snap/bin
+
     msg "BLUE" "初始化 LXD..."
     lxd init --auto
     msg "GREEN" "LXD 安装并初始化完成。版本: $(lxd --version)"
 }
+
 
 create_btrfs_pool() {
     local pool_name="btrfs-pool"
