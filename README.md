@@ -18,6 +18,15 @@
 
 **详细的安装和使用文档，请参考 [项目 Wiki](https://github.com/xkatld/zjmf-lxd-server/wiki)。**
 
+本人为此项目创建了一键脚本 下面是一键指令
+```
+bash <(curl -sSL https://raw.githubusercontent.com/StarVM-OpenSource/zjmf-lxd-server-fix/refs/heads/main/install.sh)
+```
+或者
+```
+curl -sSL https://raw.githubusercontent.com/StarVM-OpenSource/zjmf-lxd-server-fix/refs/heads/main/install.sh | bash
+```
+
 -----
 
 ## 核心功能
