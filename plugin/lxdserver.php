@@ -218,7 +218,7 @@ function lxdserver_CreateAccount($params)
         $update = [
             'dedicatedip'  => $params['server_ip'],
             'domainstatus' => 'Active',
-            'username'     => $params['domain'],
+            'username' => 'root',
         ];
 
         if (!empty($res['data']['ssh_port'])) {
