@@ -18,7 +18,7 @@ SCRIPTS=(
     ["4"]="开启BBR;https://raw.githubusercontent.com/StarVM-OpenSource/zjmf-lxd-server-fix/refs/heads/main/shell/4.sh"
     ["5"]="开启&关闭SWAP;https://raw.githubusercontent.com/StarVM-OpenSource/zjmf-lxd-server-fix/refs/heads/main/shell/5.sh"
     ["6"]="下载镜像;https://git.fsytool.top/xkatld/linuxtools/raw/branch/main/shell/install-pve.sh"
-    ["7"]="查看镜像列表;https://git.fsytool.top/xkatld/linuxtools/raw/branch/main/shell/apt-update.sh"
+    ["7"]="查看镜像列表;https://raw.githubusercontent.com/StarVM-OpenSource/zjmf-lxd-server-fix/refs/heads/main/shell/7.sh"
     ["8"]="查看被控管理网页登录信息;https://git.fsytool.top/xkatld/linuxtools/raw/branch/main/shell/disk-manager.sh"
 )
 
