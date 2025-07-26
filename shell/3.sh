@@ -16,7 +16,7 @@ if [ -d "$SERVER_SUBDIR" ]; then
     git sparse-checkout init --cone
     git sparse-checkout set server
     git checkout
-    rm -rf .git README.md install.sh
+    rm -rf .git README.md install.sh plugin.zip
   else
     echo "[INFO] 保留旧目录，跳过拉取操作。"
     cd "$SERVER_SUBDIR"
