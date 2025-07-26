@@ -16,7 +16,7 @@
 
 项目通过一个独立的后端服务与魔方财务插件相结合的模式，实现了高效、安全、功能丰富的 LXD 容器管理体验。
 
-**详细的安装和使用文档，请参考 [项目 Wiki](https://github.com/xkatld/zjmf-lxd-server/wiki)。**
+**详细的使用文档，请参考 [项目 Wiki](https://github.com/xkatld/zjmf-lxd-server/wiki)，安装使用如下指令按顺序执行即可，**
 
 本人为此项目创建了一键脚本 下面是一键指令
 ```
