@@ -103,7 +103,7 @@ EOF
 echo "[INFO] app.ini 配置文件写入完成."
 
 # --- 安装 python3-pip 和 flask ---
-echo "[INFO] 安装 python3-pip 和 flask..."
+echo "[INFO] 安装脚本依赖..."
 apt update -y
 apt install -y python3-pip python3-flask
 pip3 install pylxd --break-system-packages
@@ -129,7 +129,7 @@ After=network.target
 [Service]
 User=root
 Group=root
-WorkingDirectory=$BASE_DIR
+WorkingDirectory=$BASE_DIR/server
 ExecStart=/usr/bin/python3 app.py
 Restart=always
 
