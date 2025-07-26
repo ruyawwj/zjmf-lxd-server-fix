@@ -11,7 +11,7 @@ trim_input() {
 SERVICE_PATH="/etc/systemd/system/zram.service"
 if [ -f "$SERVICE_PATH" ]; then
   echo "检测到已有 zram 服务文件：$SERVICE_PATH"
-  read -rp "是否停止并删除旧服务，再继续？ (Y/N): " del_raw
+  read -erp "是否停止并删除旧服务，再继续？ (Y/N): " del_raw
   del=$(trim_input "$del_raw")
   if [[ "$del" =~ ^[Yy]$ ]]; then
     echo "停止旧服务..."
@@ -29,8 +29,7 @@ if [ -f "$SERVICE_PATH" ]; then
   fi
 fi
 
-echo "请输入 zram 大小，数字部分（只允许正整数且不推荐超出真实内存大小）："
-read -r size_raw
+read -erp "请输入 zram 大小，数字部分（只允许正整数且不推荐超出真实内存大小）： " size_raw
 size=$(trim_input "$size_raw")
 
 # 验证数字是否合法（正整数）
@@ -39,8 +38,7 @@ if ! [[ "$size" =~ ^[0-9]+$ ]] || [ "$size" -le 0 ]; then
   exit 1
 fi
 
-echo "请选择单位，输入 M 或 G (不区分大小写)："
-read -r unit_raw
+read -erp "请选择单位，输入 M 或 G (不区分大小写)： " unit_raw
 unit=$(trim_input "$unit_raw")
 unit=$(echo "$unit" | tr '[:lower:]' '[:upper:]')
 
@@ -53,7 +51,7 @@ zram_size="${size}${unit}"
 
 echo "生成的 zram 大小为: $zram_size"
 
-read -rp "是否写入到 $SERVICE_PATH 并启用启动？ (Y/N): " yn_raw
+read -erp "是否写入到 $SERVICE_PATH 并启用启动？ (Y/N): " yn_raw
 yn=$(trim_input "$yn_raw")
 
 if [[ "$yn" =~ ^[Yy]$ ]]; then
