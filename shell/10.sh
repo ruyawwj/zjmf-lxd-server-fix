@@ -1,5 +1,14 @@
 #!/bin/bash
 
+set -e
+
+# 确保 snap 的 lxc 可用
+if ! command -v lxc >/dev/null 2>&1; then
+  echo 'alias lxc="/snap/bin/lxc"' >> /root/.bashrc
+  export PATH=$PATH:/snap/bin
+  source /root/.bashrc
+fi
+
 INI_FILE="/root/zjmf-lxd-server-fix/server/app.ini"
 SECTION="lxc"
 KEY="DEFAULT_IMAGE_ALIAS"
