@@ -79,8 +79,7 @@ install_lxd() {
 
 create_btrfs_pool() {
     local pool_name="btrfs-pool"
-    msg "YELLOW" "请输入存储池大小 (单位: GB，正整数，默认 20): "
-    read size
+    read -erp "请输入存储池大小 (单位: GB，正整数，默认 20): " size
     size=${size:-20}
 
     if ! [[ "$size" =~ ^[1-9][0-9]*$ ]]; then
