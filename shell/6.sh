@@ -6,6 +6,18 @@ if [ "$(id -u)" -ne 0 ]; then
    exit 1
 fi
 
+# 设置 snap 路径和 alias，避免 lxc 命令未找到
+if ! lxc -h >/dev/null 2>&1; then
+    export PATH=$PATH:/snap/bin
+    echo 'export PATH=$PATH:/snap/bin' >> /root/.bashrc
+
+    if [ -x /snap/bin/lxc ]; then
+        echo 'alias lxc="/snap/bin/lxc"' >> /root/.bashrc
+        alias lxc="/snap/bin/lxc"
+        echo "已设置 alias，使 lxc 指向 /snap/bin/lxc"
+    fi
+fi
+
 check_and_install() {
     if ! command -v $1 &> /dev/null; then
         echo "$1 未安装，正在尝试安装..."
@@ -20,7 +32,8 @@ check_and_install() {
             exit 1
         fi
         if ! command -v $1 &> /dev/null; then
-            echo "安装 $1 失败，请手动安装后重试。"
+            echo "安装 $1 失败，请手动安装后重试。(LXC安装指令:export PATH=$PATH:/snap/bin && alias lxc="/snap/bin/lxc" && echo 'export PATH=$PATH:/snap/bin' >> /root/.bashrc && echo 'alias lxc="/snap/bin/lxc"' >> /root/.bashrc
+)"
             exit 1
         fi
     fi
