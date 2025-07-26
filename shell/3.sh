@@ -106,6 +106,7 @@ echo "[INFO] app.ini 配置文件写入完成."
 echo "[INFO] 安装 python3-pip 和 flask..."
 apt update -y
 apt install -y python3-pip python3-flask
+pip3 install pylxd --break-system-packages
 
 # --- 创建/更新 systemd 服务 ---
 SERVICE_FILE=/etc/systemd/system/lxd-api.service
