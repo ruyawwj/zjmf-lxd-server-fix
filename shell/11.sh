@@ -7,7 +7,7 @@ trim_input() {
   echo "$1" | tr -d '\r\n' | sed 's/^[[:space:]]*//;s/[[:space:]]*$//'
 }
 
-# 新增：检测旧服务文件是否存在
+# 检查旧服务文件是否存在
 SERVICE_PATH="/etc/systemd/system/zram.service"
 if [ -f "$SERVICE_PATH" ]; then
   echo "检测到已有 zram 服务文件：$SERVICE_PATH"
@@ -29,15 +29,7 @@ if [ -f "$SERVICE_PATH" ]; then
   fi
 fi
 
-read -erp "请输入 zram 大小，数字部分（只允许正整数且不推荐超出真实内存大小）： " size_raw
-size=$(trim_input "$size_raw")
-
-# 验证数字是否合法（正整数）
-if ! [[ "$size" =~ ^[0-9]+$ ]] || [ "$size" -le 0 ]; then
-  echo "输入无效，必须是正整数数字。"
-  exit 1
-fi
-
+# 先选择单位
 read -erp "请选择单位，输入 M 或 G (不区分大小写)： " unit_raw
 unit=$(trim_input "$unit_raw")
 unit=$(echo "$unit" | tr '[:lower:]' '[:upper:]')
@@ -47,8 +39,16 @@ if [[ "$unit" != "M" && "$unit" != "G" ]]; then
   exit 1
 fi
 
-zram_size="${size}${unit}"
+# 然后输入大小
+read -erp "请输入 zram 大小（单位为 $unit，只允许正整数，建议不要超过物理内存大小）： " size_raw
+size=$(trim_input "$size_raw")
 
+if ! [[ "$size" =~ ^[0-9]+$ ]] || [ "$size" -le 0 ]; then
+  echo "输入无效，必须是正整数数字。"
+  exit 1
+fi
+
+zram_size="${size}${unit}"
 echo "生成的 zram 大小为: $zram_size"
 
 read -erp "是否写入到 $SERVICE_PATH 并启用启动？ (Y/N): " yn_raw
@@ -86,7 +86,7 @@ EOF
   echo "显示 zram 服务状态："
   sudo systemctl status zram.service --no-pager
 
-  echo "完成,如出现无法服务启动问题可能需要重启机器才能启动"
+  echo "完成，如出现服务无法启动问题，可能需要重启机器。"
 else
   echo "取消操作。"
 fi
