@@ -31,9 +31,6 @@ else
   rm -rf .git README.md install.sh
 fi
 
-BASE_DIR=$(pwd)
-echo "[INFO] 代码目录: $BASE_DIR"
-
 # --- 获取默认外网网卡和该网卡内IP ---
 get_default_interface() {
     ip route get 8.8.8.8 2>/dev/null | awk '/dev/ {for(i=1;i<=NF;i++){if($i=="dev"){print $(i+1);exit}}}'
@@ -129,7 +126,7 @@ After=network.target
 [Service]
 User=root
 Group=root
-WorkingDirectory=$BASE_DIR/server
+WorkingDirectory=/root/zjmf-lxd-server-fix/server
 ExecStart=/usr/bin/python3 app.py
 Restart=always
 
