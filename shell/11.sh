@@ -86,7 +86,7 @@ EOF
   echo "显示 zram 服务状态："
   sudo systemctl status zram.service --no-pager
 
-  echo "完成！"
+  echo "完成,如出现无法服务启动问题可能需要重启机器才能启动"
 else
   echo "取消操作。"
 fi
