@@ -51,6 +51,8 @@ install_lxd() {
     snap install lxd
 
     # 添加 snap 路径
+    echo 'alias lxc="/snap/bin/lxc"' >> /root/.bashrc
+    source /root/.bashrc
     export PATH=$PATH:/snap/bin
 
     msg "BLUE" "初始化 LXD..."
