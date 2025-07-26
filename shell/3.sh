@@ -137,7 +137,9 @@ EOF
 systemctl daemon-reload
 systemctl enable lxd-api
 systemctl restart lxd-api
-systemctl status lxd-api
+
+echo "[INFO] 服务状态如下："
+systemctl status lxd-api --no-pager || true
 
 echo "[INFO] 脚本执行完成。"
 echo "[INFO] 如服务未正常启动，请手动执行 systemctl restart lxd-api 以确保服务正常启动，如还无法启动请发issues"
