@@ -22,6 +22,7 @@ SCRIPTS=(
     ["8"]="查看被控管理网页登录信息;https://raw.githubusercontent.com/StarVM-OpenSource/zjmf-lxd-server-fix/refs/heads/main/shell/8.sh"
     ["9"]="获取魔方对接端口与对接密钥;https://raw.githubusercontent.com/StarVM-OpenSource/zjmf-lxd-server-fix/refs/heads/main/shell/9.sh"
     ["10"]="设置未传递镜像时的默认镜像;https://raw.githubusercontent.com/StarVM-OpenSource/zjmf-lxd-server-fix/refs/heads/main/shell/10.sh"
+    ["11"]="设置未传递镜像时的默认镜像;https://raw.githubusercontent.com/StarVM-OpenSource/zjmf-lxd-server-fix/refs/heads/main/shell/11.sh"
 )
 
 # --- 颜色定义 ---
