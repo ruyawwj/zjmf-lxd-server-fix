@@ -12,11 +12,11 @@
 
 # 魔方财务-LXD 对接插件 (zjmf-lxd-server)
 
-这是一个为 [魔方财务](https://www.google.com/search?q=https://www.zjmf.com/) (ZJMF) 系统开发的 LXD 对接插件，旨在为主机商提供一套完整、自动化的 LXD 容器销售与管理解决方案。
+这是一个为 [魔方财务](https://www.idcsmart.com/) (ZJMF) 系统开发的 LXD 对接插件，旨在为主机商提供一套完整、自动化的 LXD 容器销售与管理解决方案。
 
 项目通过一个独立的后端服务与魔方财务插件相结合的模式，实现了高效、安全、功能丰富的 LXD 容器管理体验。
 
-**详细的使用文档，请参考 [项目 Wiki](https://github.com/xkatld/zjmf-lxd-server/wiki)，安装使用如下指令按顺序执行即可，**
+**详细的使用文档，请参考 [项目 Wiki](https://github.com/StarVM-OpenSource/zjmf-lxd-server-fix/wiki/%E4%BD%BF%E7%94%A8%E5%B8%AE%E5%8A%A9)，安装使用如下指令按顺序执行即可，**
 
 本人为此项目创建了一键脚本 下面是一键指令
 ```
