@@ -23,6 +23,7 @@ SCRIPTS=(
     ["9"]="获取魔方对接端口与对接密钥;https://raw.githubusercontent.com/StarVM-OpenSource/zjmf-lxd-server-fix/refs/heads/main/shell/9.sh"
     ["10"]="设置未传递镜像时的默认镜像;https://raw.githubusercontent.com/StarVM-OpenSource/zjmf-lxd-server-fix/refs/heads/main/shell/10.sh"
     ["11"]="开启zram;https://raw.githubusercontent.com/StarVM-OpenSource/zjmf-lxd-server-fix/refs/heads/main/shell/11.sh"
+    ["12"]="如提示lxc: command not found,执行此项获取手动安装指令;https://raw.githubusercontent.com/StarVM-OpenSource/zjmf-lxd-server-fix/refs/heads/main/shell/12.sh"
 )
 
 # --- 颜色定义 ---
