@@ -37,5 +37,14 @@ else
   }" "$INI_FILE"
 fi
 
+# 判断并重启 lxd-api 服务
+if systemctl list-units --full -all | grep -q '^lxd-api\.service'; then
+  echo "检测到 lxd-api 服务，正在重启..."
+  systemctl restart lxd-api
+  echo "服务 lxd-api 已重启。"
+else
+  echo "警告：未找到 lxd-api 服务，跳过重启。"
+fi
+
 echo "已更新 $INI_FILE 中的 $KEY 为: $user_input"
 exit 0
