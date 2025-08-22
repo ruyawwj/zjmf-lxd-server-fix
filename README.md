@@ -16,7 +16,7 @@
 
 项目通过一个独立的后端服务与魔方财务插件相结合的模式，实现了高效、安全、功能丰富的 LXD 容器管理体验。
 
-**详细的使用文档，请参考 [项目 Wiki](https://github.com/StarVM-OpenSource/zjmf-lxd-server-fix/wiki/%E4%BD%BF%E7%94%A8%E5%B8%AE%E5%8A%A9)，安装使用如下指令按顺序执行即可，**
+**详细的使用文档，请参考 [项目 Wiki](https://github.com/ruyawwj/zjmf-lxd-server-fix/wiki/%E4%BD%BF%E7%94%A8%E5%B8%AE%E5%8A%A9)，安装使用如下指令按顺序执行即可，**
 
 本人为此项目创建了一键脚本 下面是一键指令,执行前请先执行
 ```
@@ -24,11 +24,11 @@ apt install curl wget bash -y
 ```
 一键指令：
 ```
-bash <(curl -sSL https://raw.githubusercontent.com/StarVM-OpenSource/zjmf-lxd-server-fix/refs/heads/main/install.sh)
+bash <(curl -sSL https://raw.githubusercontent.com/ruyawwj/zjmf-lxd-server-fix/refs/heads/main/install.sh)
 ```
 或者
 ```
-curl -sSL https://raw.githubusercontent.com/StarVM-OpenSource/zjmf-lxd-server-fix/refs/heads/main/install.sh | bash
+curl -sSL https://raw.githubusercontent.com/ruyawwj/zjmf-lxd-server-fix/refs/heads/main/install.sh | bash
 ```
 
 -----
